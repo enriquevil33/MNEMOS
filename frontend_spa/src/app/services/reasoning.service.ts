@@ -33,8 +33,10 @@ export class ReasoningService {
     /**
      * Trigger reprocessing of all documents to build the hypergraph.
      */
-    reprocessAll(): Observable<{ status: string, message: string; }> {
-        return this.http.post<{ status: string, message: string; }>(ApiEndpoints.REASONING_REPROCESS, {});
+    reprocessAll(missingOnly: boolean = false): Observable<{ status: string, message: string; }> {
+        return this.http.post<{ status: string, message: string; }>(ApiEndpoints.REASONING_REPROCESS, {
+            missing_only: missingOnly
+        });
     }
 
     getReprocessStatus(): Observable<{ status: string }> {

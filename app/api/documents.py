@@ -312,11 +312,27 @@ def generate_summary(doc_id):
 @bp.route('/reprocess-hypergraph', methods=['POST'])
 def reprocess_hypergraph():
     """
-    Triggers background tasks to re-extract hypergraph data from ALL documents.
+    Triggers background tasks to re-extract hypergraph data from documents.
+    Supports 'missing_only' flag to avoid reprocessing existing graphs.
     """
     from app.tasks.processing import reprocess_hypergraph_task
+    from app.models.knowledge_graph import HyperEdge
     
+    data = request.get_json() or {}
+    missing_only = data.get('missing_only', False)
+
     docs = db.session.query(Document).all()
+    
+    if missing_only:
+        # Find documents that already have edges
+        existing_doc_ids = db.session.query(HyperEdge.source_document_id).distinct().all()
+        # Flatten list of tuples
+        existing_ids = {str(row[0]) for row in existing_doc_ids if row[0]}
+        
+        # Filter docs
+        docs = [d for d in docs if str(d.id) not in existing_ids]
+        logger.info(f"Missing Only Mode: Found {len(docs)} documents needing processing out of {len(existing_ids)} existing.")
+
     count = 0
     
     for doc in docs:

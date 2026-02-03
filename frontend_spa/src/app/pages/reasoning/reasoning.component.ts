@@ -7,12 +7,13 @@ import { CollectionService } from '../../services/collection.service';
 import { ConversationsService } from '../../services/conversations.service';
 import { Collection } from '../../core/models/collection.model';
 import { GraphVisualizerComponent } from '../../shared/components/graph-visualizer/graph-visualizer.component';
+import { ConfirmationModalComponent } from '../../shared/components/confirmation-modal/confirmation-modal.component';
 import { Router } from '@angular/router';
 
 @Component({
     selector: 'app-reasoning',
     standalone: true,
-    imports: [CommonModule, FormsModule, GraphVisualizerComponent],
+    imports: [CommonModule, FormsModule, GraphVisualizerComponent, ConfirmationModalComponent],
     template: `
     <div class="h-full flex flex-col gap-6 p-6">
       
@@ -21,6 +22,12 @@ import { Router } from '@angular/router';
         <div>
             <h1 class="text-3xl font-bold mb-2 text-primary">
             Reasoning Engine
+             <a href="https://arxiv.org/abs/2601.04878v1" target="_blank" class="ml-2 inline-flex items-center justify-center p-1 rounded-full text-secondary hover:text-accent hover:bg-hover transition-colors" title="Learn more about Reasoning Engines">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 17h.01" />
+                </svg>
+             </a>
             </h1>
             <p class="text-secondary">Explore hidden connections in your knowledge graph.</p>
         </div>
@@ -155,6 +162,11 @@ import { Router } from '@angular/router';
             }
         </div>
       </div>
+
+      <app-confirmation-modal 
+        #confirmModal
+        (onConfirm)="handleReprocessConfirm($event)"
+      ></app-confirmation-modal>
     </div>
   `,
     styles: [`
@@ -261,11 +273,32 @@ export class ReasoningComponent implements AfterViewInit, OnDestroy {
         });
     }
 
+    @ViewChild('confirmModal') confirmModal!: ConfirmationModalComponent;
+
     triggerReprocess() {
-        if (!confirm("This will scan ALL documents to build the knowledge graph. It may take a while. Continue?")) return;
+        this.confirmModal.open({
+            title: 'Rebuild Knowledge Graph',
+            message: 'We suggest using local LLMs for avoiding API expensive costs. Also consider that this will process all documents and may take some hours.',
+            comment: 'Use base LLM for better results if cost is not an issue.',
+            showToggle: true,
+            toggleLabel: 'Rebuild Missing Only (Faster)',
+            toggleLabelOn: 'Rebuild EVERYTHING (Full Reset)',
+            toggleLabelOff: 'Rebuild Missing Only (Faster)',
+            toggleValue: false, // Default off -> only missing
+            confirmText: 'Accept',
+            cancelText: 'Close'
+        });
+    }
+
+    handleReprocessConfirm(event: { toggleValue: boolean }) {
+        // Toggle ON = Rebuild Everything (missingOnly = false)
+        // Toggle OFF = Rebuild Missing Only (missingOnly = true)
+        const missingOnly = !event.toggleValue;
 
         this.isReprocessing.set(true);
-        this.reasoningService.reprocessAll().subscribe({
+        this.toastr.info('Take a seat and let LLM read all', 'Job Started');
+
+        this.reasoningService.reprocessAll(missingOnly).subscribe({
             next: (res) => {
                 this.toastr.info(res.message);
 
@@ -275,7 +308,8 @@ export class ReasoningComponent implements AfterViewInit, OnDestroy {
                         next: (statusRes) => {
                             if (statusRes.status !== 'processing') {
                                 this.isReprocessing.set(false);
-                                this.toastr.success('Knowledge Graph Rebuilt Successfully');
+                                this.isReprocessing.set(false);
+                                this.toastr.success(statusRes.status === 'completed' ? 'Knowledge Graph Rebuilt Successfully' : `Process finished: ${statusRes.status}`);
                                 clearInterval(pollInterval);
                             }
                         },
