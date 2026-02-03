@@ -1,6 +1,6 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom, interval } from 'rxjs';
+import { Observable, firstValueFrom, interval } from 'rxjs';
 import { ApiEndpoints } from '@core/constants/api-endpoints';
 import { Document } from '@core/models';
 
@@ -14,24 +14,27 @@ export class DocumentsService {
     // State
     documents = signal<Document[]>([]);
 
-    selectedCount = computed(() => this.documents().filter(d => d.selected).length);
+    selectedCount = computed(() => this.documents().filter((d: Document) => d.selected).length);
     totalCount = computed(() => this.documents().length);
 
     constructor() {
     }
 
+    getDocuments(collectionId?: string | null): Observable<Document[]> {
+        let url = ApiEndpoints.DOCUMENTS;
+        if (collectionId !== undefined) {
+            url += `?collection_id=${collectionId}`;
+        } else if (collectionId === null) {
+            url += `?collection_id=null`;
+        }
+        return this.http.get<Document[]>(url);
+    }
+
     async fetchDocuments(collectionId?: string | null) {
         try {
-            let url = ApiEndpoints.DOCUMENTS;
-            if (collectionId !== undefined) {
-                url += `?collection_id=${collectionId}`;
-            } else if (collectionId === null) {
-                url += `?collection_id=null`;
-            }
-
-            const docs = await firstValueFrom(this.http.get<Document[]>(url));
+            const docs = await firstValueFrom(this.getDocuments(collectionId));
             // Map backend fields to UI fields if necessary, or just use them
-            this.documents.set(docs.map(d => ({ ...d, selected: false })));
+            this.documents.set(docs.map((d: Document) => ({ ...d, selected: false })));
         } catch (error) {
             console.error('Failed to fetch documents', error);
         }
@@ -40,8 +43,8 @@ export class DocumentsService {
     async updateDocument(id: string, updates: Partial<Document>) {
         try {
             const updatedDoc = await firstValueFrom(this.http.put<Document>(`${ApiEndpoints.DOCUMENTS}/${id}`, updates));
-            this.documents.update(docs =>
-                docs.map(d => d.id === id ? { ...updatedDoc, selected: d.selected } : d)
+            this.documents.update((docs: Document[]) =>
+                docs.map((d: Document) => d.id === id ? { ...updatedDoc, selected: d.selected } : d)
             );
             return updatedDoc;
         } catch (error) {
@@ -51,13 +54,13 @@ export class DocumentsService {
     }
 
     toggleDocument(id: string) {
-        this.documents.update(docs =>
-            docs.map(d => d.id === id ? { ...d, selected: !d.selected } : d)
+        this.documents.update((docs: Document[]) =>
+            docs.map((d: Document) => d.id === id ? { ...d, selected: !d.selected } : d)
         );
     }
 
     clearSelection() {
-        this.documents.update(docs => docs.map(d => ({ ...d, selected: false })));
+        this.documents.update((docs: Document[]) => docs.map((d: Document) => ({ ...d, selected: false })));
     }
 
     async uploadDocument(file: File) {
@@ -65,8 +68,8 @@ export class DocumentsService {
         formData.append('file', file);
 
         try {
-            const newDoc = await firstValueFrom(this.http.post<Document>(ApiEndpoints.DOCUMENTS_UPLOAD, formData));
-            this.documents.update(docs => [{ ...newDoc, selected: false }, ...docs]);
+            const newDoc: Document = await firstValueFrom(this.http.post<Document>(ApiEndpoints.DOCUMENTS_UPLOAD, formData));
+            this.documents.update((docs: Document[]) => [{ ...newDoc, selected: false }, ...docs]);
 
             // Start polling for status if document is pending/processing
             if (newDoc.status === 'pending' || newDoc.status === 'processing') {
@@ -85,8 +88,8 @@ export class DocumentsService {
         formData.append('youtube_url', url);
 
         try {
-            const newDoc = await firstValueFrom(this.http.post<Document>(ApiEndpoints.DOCUMENTS_UPLOAD, formData));
-            this.documents.update(docs => [{ ...newDoc, selected: false }, ...docs]);
+            const newDoc: Document = await firstValueFrom(this.http.post<Document>(ApiEndpoints.DOCUMENTS_UPLOAD, formData));
+            this.documents.update((docs: Document[]) => [{ ...newDoc, selected: false }, ...docs]);
 
             // Start polling for status
             if (newDoc.status === 'pending' || newDoc.status === 'processing') {
@@ -109,13 +112,13 @@ export class DocumentsService {
         // Poll every 2 seconds
         const subscription = interval(2000).subscribe(async () => {
             try {
-                const statusUpdate = await firstValueFrom(
+                const statusUpdate: { status: string, error?: string } = await firstValueFrom(
                     this.http.get<{ status: string, error?: string }>(ApiEndpoints.DOCUMENT_STATUS(docId))
                 );
 
                 // Update document in list
-                this.documents.update(docs =>
-                    docs.map(d => d.id === docId ? { ...d, status: statusUpdate.status as Document['status'], error_message: statusUpdate.error } : d)
+                this.documents.update((docs: Document[]) =>
+                    docs.map((d: Document) => d.id === docId ? { ...d, status: statusUpdate.status as Document['status'], error_message: statusUpdate.error } : d)
                 );
 
                 // Stop polling if completed or failed
@@ -145,7 +148,7 @@ export class DocumentsService {
             this.stopPolling(id);
 
             await firstValueFrom(this.http.delete(ApiEndpoints.DOCUMENT_DELETE(id)));
-            this.documents.update(docs => docs.filter(d => d.id !== id));
+            this.documents.update((docs: Document[]) => docs.filter((d: Document) => d.id !== id));
         } catch (error) {
             console.error('Delete failed', error);
         }

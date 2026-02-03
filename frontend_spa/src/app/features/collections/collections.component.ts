@@ -1,13 +1,13 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { CollectionService } from '../../services/collection.service';
 import { Collection } from '../../core/models/collection.model';
+import { CollectionModalComponent } from './collection-modal/collection-modal.component';
 
 @Component({
     selector: 'app-collections-page',
     standalone: true,
-    imports: [CommonModule, FormsModule, ReactiveFormsModule],
+    imports: [CommonModule, CollectionModalComponent],
     template: `
     <div class="container mx-auto p-4 max-w-4xl">
       <div class="flex justify-between items-center mb-6">
@@ -38,68 +38,26 @@ import { Collection } from '../../core/models/collection.model';
         </div>
       </div>
 
-       <!-- Modal -->
-       <!-- Modal -->
-       <div class="modal" [class.modal-open]="isModalOpen">
-          <!-- Backdrop -->
-          <div class="modal-backdrop" (click)="closeModal()"></div>
-          
-          <div class="modal-box bg-panel border border-divider p-0 overflow-hidden">
-             <!-- Header -->
-             <div class="flex items-center justify-between p-4 sm:p-6 border-b border-divider bg-panel/50">
-                 <h3 class="font-bold text-lg text-primary">{{ isEditing ? 'Edit Collection' : 'New Collection' }}</h3>
-                 <button (click)="closeModal()" class="btn btn-ghost btn-sm btn-circle text-secondary hover:text-primary">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                 </button>
-             </div>
-             
-             <form [formGroup]="form" (ngSubmit)="onSubmit()">
-                <div class="p-4 sm:p-6 space-y-4">
-                    <div class="form-control w-full">
-                        <label class="block text-sm font-medium text-base-content mb-2">Name</label>
-                        <input type="text" formControlName="name" class="w-full px-3 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-base-content placeholder-secondary/50" placeholder="e.g., Finance, Science Fiction" />
-                    </div>
-                    
-                    <div class="form-control w-full">
-                        <label class="block text-sm font-medium text-base-content mb-2">Description</label>
-                        <textarea formControlName="description" class="w-full px-3 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent h-24 text-base-content placeholder-secondary/50 resize-none" placeholder="Optional description"></textarea>
-                    </div>
-
-                    <p *ngIf="errorMessage" class="text-error text-sm">{{ errorMessage }}</p>
-                </div>
-
-                <!-- Footer -->
-                <div class="flex items-center justify-end gap-2 p-4 sm:p-6 border-t border-divider bg-panel/50">
-                    <button type="button" class="btn btn-ghost text-secondary hover:text-primary" (click)="closeModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary" [disabled]="form.invalid || isLoading">
-                        <span *ngIf="isLoading" class="loading-dots mr-2"><span></span><span></span><span></span></span>
-                        Save
-                    </button>
-                </div>
-             </form>
-          </div>
-       </div>
+       <app-collection-modal
+          [isOpen]="isModalOpen"
+          [collection]="currentCollection"
+          [isLoading]="isLoading"
+          [errorMessage]="errorMessage"
+          (save)="onSave($event)"
+          (cancel)="closeModal()">
+       </app-collection-modal>
     </div>
   `
 })
 export class CollectionsPageComponent implements OnInit {
     private colService = inject(CollectionService);
-    private fb = inject(FormBuilder);
 
     collections = signal<Collection[]>([]);
 
     isModalOpen = false;
-    isEditing = false;
-    editingId: string | null = null;
+    currentCollection: Collection | null = null;
     isLoading = false;
     errorMessage = '';
-
-    form = this.fb.group({
-        name: ['', Validators.required],
-        description: ['']
-    });
 
     ngOnInit() {
         this.loadCollections();
@@ -113,20 +71,13 @@ export class CollectionsPageComponent implements OnInit {
     }
 
     openCreateModal() {
-        this.isEditing = false;
-        this.editingId = null;
-        this.form.reset();
+        this.currentCollection = null;
         this.errorMessage = '';
         this.isModalOpen = true;
     }
 
     openEditModal(col: Collection) {
-        this.isEditing = true;
-        this.editingId = col.id;
-        this.form.patchValue({
-            name: col.name,
-            description: col.description
-        });
+        this.currentCollection = col;
         this.errorMessage = '';
         this.isModalOpen = true;
     }
@@ -135,16 +86,13 @@ export class CollectionsPageComponent implements OnInit {
         this.isModalOpen = false;
     }
 
-    onSubmit() {
-        if (this.form.invalid) return;
-
+    onSave(data: Partial<Collection>) {
         this.isLoading = true;
         this.errorMessage = '';
-        const val = this.form.value;
 
-        const request$ = this.isEditing && this.editingId
-            ? this.colService.updateCollection(this.editingId, val as any)
-            : this.colService.createCollection(val as any);
+        const request$ = this.currentCollection
+            ? this.colService.updateCollection(this.currentCollection.id, data)
+            : this.colService.createCollection(data);
 
         request$.subscribe({
             next: (res) => {
