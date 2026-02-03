@@ -31,12 +31,37 @@ import { Collection } from '../../../core/models/collection.model';
         <option value="video">Video</option>
         <option value="youtube">YouTube</option>
       </select>
+
+      <!-- Collection Actions (appears when 1+ selected) -->
+      @if (selectedCount >= 1) {
+        <div class="flex gap-2 ml-auto">
+          @if (selectedCount >= 2) {
+            <button (click)="createCollection.emit()"
+                    class="btn btn-primary btn-sm gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+              </svg>
+              Create ({{ selectedCount }})
+            </button>
+          }
+          <button (click)="addToCollection.emit()"
+                  class="btn btn-outline btn-sm gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+              <path d="M3.75 3A1.75 1.75 0 002 4.75v3.5C2 9.216 2.784 10 3.75 10h3.5A1.75 1.75 0 009 8.25v-3.5A1.75 1.75 0 007.25 3h-3.5zM3.75 12A1.75 1.75 0 002 13.75v3.5c0 .966.784 1.75 1.75 1.75h3.5A1.75 1.75 0 009 17.25v-3.5A1.75 1.75 0 007.25 12h-3.5zM12 4.75A1.75 1.75 0 0113.75 3h3.5A1.75 1.75 0 0119 4.75v3.5A1.75 1.75 0 0117.25 10h-3.5A1.75 1.75 0 0112 8.25v-3.5zM13.75 12A1.75 1.75 0 0012 13.75v3.5c0 .966.784 1.75 1.75 1.75h3.5A1.75 1.75 0 0019 17.25v-3.5A1.75 1.75 0 0017.25 12h-3.5z" />
+            </svg>
+            Add to Collection ({{ selectedCount }})
+          </button>
+        </div>
+      }
     </div>
   `
 })
 export class FilterBarComponent {
   @Input() collections: Collection[] = [];
+  @Input() selectedCount: number = 0;
   @Output() filterChange = new EventEmitter<any>();
+  @Output() createCollection = new EventEmitter<void>();
+  @Output() addToCollection = new EventEmitter<void>();
 
   searchText: string = '';
   selectedCollectionId: string | null = null;

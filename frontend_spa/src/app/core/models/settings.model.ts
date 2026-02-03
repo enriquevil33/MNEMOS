@@ -61,6 +61,7 @@ export interface ChatPreferences {
   llm_top_p?: number;
   llm_frequency_penalty?: number;
   llm_presence_penalty?: number;
+  archive_enabled?: boolean;
 }
 
 export interface LLMConnection {

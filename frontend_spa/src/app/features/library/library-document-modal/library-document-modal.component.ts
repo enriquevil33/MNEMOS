@@ -1,14 +1,17 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Document } from '../../../core/models/document.model';
+import { Document, DocumentSection } from '../../../core/models/document.model';
 import { Collection } from '../../../core/models/collection.model';
 import { DocumentPropertiesFormComponent } from './document-properties-form/document-properties-form.component';
+import { MarkdownDisplayComponent } from '../../../components/markdown/markdown-display.component';
+import { ModalService } from '../../../services/modal.service';
+import { ApiEndpoints } from '../../../core/constants/api-endpoints';
 
 @Component({
   selector: 'app-library-document-modal',
   standalone: true,
-  imports: [CommonModule, DocumentPropertiesFormComponent],
+  imports: [CommonModule, DocumentPropertiesFormComponent, MarkdownDisplayComponent],
   template: `
     <!-- Main Modal Overlay -->
     <div *ngIf="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true">
@@ -25,7 +28,7 @@ import { DocumentPropertiesFormComponent } from './document-properties-form/docu
                 <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0 border border-primary/20">
                     <span class="text-xs font-bold uppercase tracking-wider">{{ document?.file_type?.slice(0,3) }}</span>
                 </div>
-                
+
                 <div class="flex flex-col overflow-hidden">
                     <h3 class="font-bold text-2xl text-gray-100 truncate tracking-tight">
                         {{ document?.tag || document?.original_filename || 'Document Details' }}
@@ -37,8 +40,14 @@ import { DocumentPropertiesFormComponent } from './document-properties-form/docu
                     </div>
                 </div>
            </div>
-           
-           <div class="flex items-center gap-2">
+
+           <div class="flex items-center gap-3">
+               <!-- Open Document Button -->
+               <button (click)="openDocument()" class="px-4 py-2 rounded-lg hover:bg-primary-focus text-primary-content font-medium text-sm flex items-center gap-2 transition-colors shadow-lg">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                  READ
+               </button>
+
                <!-- Close Button -->
                <button (click)="onClose.emit()" class="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
                   <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -55,32 +64,153 @@ import { DocumentPropertiesFormComponent } from './document-properties-form/docu
             <div class="flex-1 overflow-y-auto custom-scrollbar p-8">
                 <div class="max-w-4xl mx-auto space-y-8">
                     
-                    <!-- Summary Card -->
-                    <div class="bg-[#14181c] border border-white/10 rounded-xl shadow-sm overflow-hidden group">
-                        <div class="px-6 py-4 border-b border-white/5 bg-white/5 flex items-center gap-2">
-                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="21" y1="18" x2="3" y2="18"></line></svg>
-                             <h4 class="font-bold text-sm uppercase tracking-wider text-gray-400">Summary</h4>
+                    <!-- Content Section with Tabs -->
+                    <div class="space-y-4">
+                        <!-- Tab Navigation -->
+                        <div class="flex items-center gap-1 border-b border-white/10">
+                            <button
+                                (click)="activeTab = 'summary'"
+                                [class.text-primary]="activeTab === 'summary'"
+                                [class.border-primary]="activeTab === 'summary'"
+                                [class.text-gray-500]="activeTab !== 'summary'"
+                                [class.border-transparent]="activeTab !== 'summary'"
+                                class="px-4 py-2 text-sm font-medium border-b-2 transition-colors hover:text-gray-300">
+                                Summary
+                            </button>
+                            <button
+                                (click)="activeTab = 'index'"
+                                [class.text-primary]="activeTab === 'index'"
+                                [class.border-primary]="activeTab === 'index'"
+                                [class.text-gray-500]="activeTab !== 'index'"
+                                [class.border-transparent]="activeTab !== 'index'"
+                                class="px-4 py-2 text-sm font-medium border-b-2 transition-colors hover:text-gray-300">
+                                Index
+                            </button>
+                            <button
+                                (click)="activeTab = 'concepts'"
+                                [class.text-primary]="activeTab === 'concepts'"
+                                [class.border-primary]="activeTab === 'concepts'"
+                                [class.text-gray-500]="activeTab !== 'concepts'"
+                                [class.border-transparent]="activeTab !== 'concepts'"
+                                class="px-4 py-2 text-sm font-medium border-b-2 transition-colors hover:text-gray-300">
+                                Key Concepts
+                            </button>
                         </div>
-                        <div class="p-8">
-                            @if (document?.summary) {
-                                <p class="text-lg leading-relaxed text-gray-200 font-serif whitespace-pre-line">{{ document?.summary }}</p>
-                            } @else {
-                                <div class="flex flex-col items-center justify-center py-12 text-gray-600 gap-3">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                    <span class="italic font-medium">No summary available yet.</span>
-                                    <button (click)="generateSummary()" *ngIf="!isGeneratingSummary" class="mt-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-                                        Generate Manual Summary
-                                    </button>
-                                    
-                                    <div *ngIf="isGeneratingSummary" class="w-full max-w-xs mt-3">
-                                        <div class="flex justify-between text-xs text-gray-400 mb-1">
-                                            <span>Generating summary...</span>
-                                            <span>{{ currentProgress }}%</span>
+
+                        <!-- Tab Content -->
+                        <div class="pt-2">
+                            <!-- Summary Tab -->
+                            @if (activeTab === 'summary') {
+                                <div class="text-base leading-relaxed text-gray-200">
+                                    @if (document?.summary) {
+                                        <app-markdown-display [content]="document!.summary!"></app-markdown-display>
+                                    } @else {
+                                        <div class="flex flex-col items-center justify-center py-12 text-gray-600 gap-3">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                            <span class="italic font-medium">No summary available yet.</span>
+                                            <button (click)="generateSummary()" *ngIf="!isGeneratingSummary" class="mt-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                                Generate Manual Summary
+                                            </button>
+
+                                            <div *ngIf="isGeneratingSummary" class="w-full max-w-xs mt-3">
+                                                <div class="flex justify-between text-xs text-gray-400 mb-1">
+                                                    <span>Generating summary...</span>
+                                                    <span>{{ currentProgress }}%</span>
+                                                </div>
+                                                <div class="h-2 bg-white/10 rounded-full overflow-hidden">
+                                                    <div class="h-full bg-primary transition-all duration-300 ease-out" [style.width.%]="currentProgress"></div>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div class="h-2 bg-white/10 rounded-full overflow-hidden">
-                                            <div class="h-full bg-primary transition-all duration-300 ease-out" [style.width.%]="currentProgress"></div>
+                                    }
+                                </div>
+                            }
+
+                            <!-- Index Tab -->
+                            @if (activeTab === 'index') {
+                                <div class="text-base leading-relaxed text-gray-200">
+                                    @if (loadingSections) {
+                                        <div class="flex flex-col items-center justify-center py-12 text-gray-600 gap-3">
+                                            <div class="loading loading-spinner loading-lg text-primary"></div>
+                                            <span class="italic font-medium">Loading sections...</span>
                                         </div>
-                                    </div>
+                                    } @else if (sections.length) {
+                                        <div class="space-y-6">
+                                            @for (section of sections; track section.id) {
+                                                <div class="space-y-3">
+                                                    <!-- Section Header -->
+                                                    <div class="flex items-start justify-between gap-3">
+                                                        <h5 class="font-semibold text-lg text-gray-200 flex-1">
+                                                            {{ section.title }}
+                                                        </h5>
+                                                        <div class="flex items-center gap-2 shrink-0">
+                                                            @if (section.start_page) {
+                                                                <span class="text-xs text-gray-500 font-mono bg-white/5 px-2 py-1 rounded">
+                                                                    @if (section.end_page && section.end_page !== section.start_page) {
+                                                                        pp. {{ section.start_page }}-{{ section.end_page }}
+                                                                    } @else {
+                                                                        p. {{ section.start_page }}
+                                                                    }
+                                                                </span>
+                                                            }
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Section Content -->
+                                                    @if (section.content) {
+                                                        <div class="text-sm text-gray-300 pl-4 border-l-2 border-primary/30">
+                                                            <app-markdown-display [content]="section.content"></app-markdown-display>
+                                                        </div>
+                                                    }
+
+                                                    <!-- Section Metadata -->
+                                                    @if (section.metadata && hasVisibleMetadata(section.metadata)) {
+                                                        <details class="pl-4">
+                                                            <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-400 transition-colors font-medium uppercase tracking-wider">Metadata</summary>
+                                                            <div class="mt-2 text-xs text-gray-400 bg-black/20 rounded p-3">
+                                                                <pre class="font-mono whitespace-pre-wrap break-words">{{ formatMetadata(section.metadata) }}</pre>
+                                                            </div>
+                                                        </details>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    } @else {
+                                        <div class="flex flex-col items-center justify-center py-12 text-gray-600 gap-3">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                            <span class="italic font-medium">No section index available.</span>
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            <!-- Key Concepts Tab -->
+                            @if (activeTab === 'concepts') {
+                                <div class="text-base leading-relaxed text-gray-200">
+                                    @if (getKeyConcepts()?.length) {
+                                        <div class="space-y-2">
+                                            @for (concept of getKeyConcepts(); track concept.term) {
+                                                <div [class.space-y-1]="concept.description">
+                                                    <div class="flex items-start gap-2">
+                                                        <span class="text-primary shrink-0 mt-1">•</span>
+                                                        <div class="flex-1">
+                                                            <span class="font-semibold text-gray-200">{{ concept.term }}</span>
+                                                            @if (concept.description) {
+                                                                <div class="text-sm text-gray-400 mt-1">
+                                                                    <app-markdown-display [content]="concept.description"></app-markdown-display>
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    } @else {
+                                        <div class="flex flex-col items-center justify-center py-12 text-gray-600 gap-3">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                            <span class="italic font-medium">No key concepts available.</span>
+                                        </div>
+                                    }
                                 </div>
                             }
                         </div>
@@ -117,12 +247,14 @@ import { DocumentPropertiesFormComponent } from './document-properties-form/docu
                     </div>
 
                     <!-- Comments Section -->
-                    <div *ngIf="document?.comment" class="bg-[#14181c] border border-white/10 rounded-xl shadow-sm p-6">
-                        <h4 class="text-sm font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                            Comment
-                        </h4>
-                        <p class="text-gray-300 whitespace-pre-wrap leading-relaxed">{{ document?.comment }}</p>
+                    <div *ngIf="document?.comment" class="space-y-3">
+                        <div class="flex items-center gap-2 px-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                            <h4 class="font-semibold text-sm uppercase tracking-wider text-gray-500">Comment</h4>
+                        </div>
+                        <div class="text-base leading-relaxed text-gray-300">
+                            <app-markdown-display [content]="document!.comment!"></app-markdown-display>
+                        </div>
                     </div>
 
                 </div>
@@ -142,12 +274,54 @@ import { DocumentPropertiesFormComponent } from './document-properties-form/docu
                  <div class="h-8"></div> <!-- Spacer -->
 
                  <div class="border-t border-white/10 pt-6">
-                     <button (click)="showTechnical = !showTechnical" class="w-full flex items-center justify-between text-sm font-bold text-gray-500 hover:text-primary transition-colors mb-2">
-                        <span>Technical Metadata</span>
-                        <span  [class.rotate-180]="showTechnical" class="transition-transform">▼</span>
+                     <button (click)="showTechnical = !showTechnical" class="w-full flex items-center justify-between text-sm font-semibold text-gray-400 hover:text-primary transition-colors mb-3 group">
+                        <div class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                            <span class="uppercase tracking-wider text-xs">Technical Metadata</span>
+                        </div>
+                        <svg [class.rotate-180]="showTechnical" class="w-4 h-4 transition-transform opacity-60 group-hover:opacity-100" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
                      </button>
-                     <div *ngIf="showTechnical" class="bg-black/20 rounded-lg border border-white/5 p-3 overflow-hidden animate-fade-in">
-                        <pre class="text-[10px] text-gray-400 font-mono overflow-x-auto custom-scrollbar whitespace-pre-wrap break-all">{{ document?.metadata | json }}</pre>
+                     <div *ngIf="showTechnical" class="space-y-2 animate-fade-in">
+                        <!-- File Info -->
+                        <div class="bg-black/30 rounded-lg p-3 space-y-2">
+                            <div class="flex justify-between text-xs">
+                                <span class="text-gray-500 font-medium">File Type</span>
+                                <span class="text-gray-300 font-mono">{{ document?.file_type || 'N/A' }}</span>
+                            </div>
+                            <div class="flex justify-between text-xs">
+                                <span class="text-gray-500 font-medium">File Size</span>
+                                <span class="text-gray-300 font-mono">{{ formatBytes(getMetadataValue('file_size')) }}</span>
+                            </div>
+                            <div class="flex justify-between text-xs">
+                                <span class="text-gray-500 font-medium">Document ID</span>
+                                <span class="text-gray-300 font-mono text-[10px] truncate max-w-[200px]">{{ document?.id || 'N/A' }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Processing Info -->
+                        <div *ngIf="hasProcessingInfo()" class="bg-black/30 rounded-lg p-3 space-y-2">
+                            <div class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Processing</div>
+                            <div *ngIf="getMetadataValue('chunk_count')" class="flex justify-between text-xs">
+                                <span class="text-gray-500 font-medium">Chunks</span>
+                                <span class="text-gray-300 font-mono">{{ getMetadataValue('chunk_count') }}</span>
+                            </div>
+                            <div *ngIf="getMetadataValue('pages')" class="flex justify-between text-xs">
+                                <span class="text-gray-500 font-medium">Pages</span>
+                                <span class="text-gray-300 font-mono">{{ getMetadataValue('pages') }}</span>
+                            </div>
+                            <div *ngIf="getMetadataValue('duration')" class="flex justify-between text-xs">
+                                <span class="text-gray-500 font-medium">Duration</span>
+                                <span class="text-gray-300 font-mono">{{ formatDuration(getMetadataValue('duration')) }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Raw JSON -->
+                        <details class="bg-black/30 rounded-lg overflow-hidden">
+                            <summary class="p-3 text-xs font-medium text-gray-500 cursor-pointer hover:bg-white/5 transition-colors uppercase tracking-wider">Raw JSON</summary>
+                            <div class="p-3 pt-0">
+                                <pre class="text-[10px] text-gray-400 font-mono overflow-x-auto custom-scrollbar whitespace-pre-wrap break-all leading-relaxed">{{ document?.metadata | json }}</pre>
+                            </div>
+                        </details>
                      </div>
                  </div>
             </div>
@@ -208,7 +382,7 @@ import { DocumentPropertiesFormComponent } from './document-properties-form/docu
     </div>
   `
 })
-export class LibraryDocumentModalComponent {
+export class LibraryDocumentModalComponent implements OnChanges {
   @Input() document: Document | null = null;
   @Input() collections: Collection[] = [];
   @Input() isOpen: boolean = false;
@@ -228,8 +402,39 @@ export class LibraryDocumentModalComponent {
   isGeneratingSummary = false;
   currentProgress = 0;
   pollInterval: any;
+  activeTab: 'summary' | 'index' | 'concepts' = 'summary';
+
+  // Sections data
+  sections: DocumentSection[] = [];
+  loadingSections = false;
+
+  private modalService = inject(ModalService);
 
   constructor(private http: HttpClient) { }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // Load sections when document changes and modal opens
+    if (changes['document'] && this.document?.id || changes['isOpen'] && this.isOpen && this.document?.id) {
+      this.loadSections();
+    }
+  }
+
+  loadSections(): void {
+    if (!this.document?.id) return;
+
+    this.loadingSections = true;
+    this.http.get<DocumentSection[]>(`/api/documents/${this.document.id}/sections`).subscribe({
+      next: (sections) => {
+        this.sections = sections;
+        this.loadingSections = false;
+      },
+      error: (err) => {
+        console.error('Failed to load sections', err);
+        this.sections = [];
+        this.loadingSections = false;
+      }
+    });
+  }
 
   getCollectionName(id?: string | null): string {
     if (!id) return 'Uncategorized';
@@ -400,6 +605,132 @@ export class LibraryDocumentModalComponent {
       setTimeout(() => this.copied = false, 2000);
     }).catch(err => {
       console.error('Failed to copy text', err);
+    });
+  }
+
+  // --- Open Document Viewer ---
+
+  openDocument() {
+    if (!this.document) return;
+
+    const fileType = this.document.file_type;
+
+    if (fileType === 'pdf' || this.document.original_filename?.toLowerCase().endsWith('.pdf')) {
+      this.modalService.openPdfViewer(this.document);
+    } else if (fileType === 'youtube') {
+      const meta = this.document.metadata as any;
+      const url = meta?.youtube_url || meta?.url;
+      if (url) {
+        this.modalService.openYoutubeViewer(url);
+      }
+    } else if (fileType === 'video' || fileType === 'audio') {
+      const url = ApiEndpoints.DOCUMENT_CONTENT(this.document.id);
+      this.modalService.openVideoPlayer(url);
+    } else {
+      // For other file types, you might want to download or show a message
+      alert('Viewer not available for this file type');
+    }
+  }
+
+  // --- Metadata Helper Methods ---
+
+  getMetadataValue(key: string): any {
+    if (!this.document?.metadata) return null;
+    const meta = this.document.metadata as any;
+    return meta[key];
+  }
+
+  hasProcessingInfo(): boolean {
+    return !!(
+      this.getMetadataValue('chunk_count') ||
+      this.getMetadataValue('pages') ||
+      this.getMetadataValue('duration')
+    );
+  }
+
+  formatBytes(bytes: any): string {
+    if (!bytes || isNaN(bytes)) return 'N/A';
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    if (bytes === 0) return '0 Bytes';
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + ' ' + sizes[i];
+  }
+
+  formatDuration(seconds: any): string {
+    if (!seconds || isNaN(seconds)) return 'N/A';
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    if (hrs > 0) {
+      return `${hrs}h ${mins}m ${secs}s`;
+    } else if (mins > 0) {
+      return `${mins}m ${secs}s`;
+    } else {
+      return `${secs}s`;
+    }
+  }
+
+  // --- Tab Content Helpers ---
+
+  hasVisibleMetadata(metadata: any): boolean {
+    if (!metadata || typeof metadata !== 'object') return false;
+    return Object.keys(metadata).length > 0;
+  }
+
+  formatMetadata(metadata: any): string {
+    if (!metadata) return '';
+    try {
+      return JSON.stringify(metadata, null, 2);
+    } catch (e) {
+      return String(metadata);
+    }
+  }
+
+  getKeyConcepts(): Array<{ term: string; description?: string }> | null {
+    let concepts: any[] | null = null;
+
+    // First, try document-level metadata
+    if (this.document?.metadata) {
+      const meta = this.document.metadata as any;
+
+      if (meta.key_concepts && Array.isArray(meta.key_concepts)) {
+        concepts = meta.key_concepts;
+      } else if (meta.concepts && Array.isArray(meta.concepts)) {
+        concepts = meta.concepts;
+      } else if (meta.terms && Array.isArray(meta.terms)) {
+        concepts = meta.terms;
+      }
+    }
+
+    // If not found in document metadata, aggregate from sections
+    if (!concepts && this.sections.length > 0) {
+      const allConcepts: string[] = [];
+      this.sections.forEach(section => {
+        if (section.metadata) {
+          const sectionMeta = section.metadata as any;
+          if (sectionMeta.key_concepts && Array.isArray(sectionMeta.key_concepts)) {
+            allConcepts.push(...sectionMeta.key_concepts);
+          } else if (sectionMeta.concepts && Array.isArray(sectionMeta.concepts)) {
+            allConcepts.push(...sectionMeta.concepts);
+          }
+        }
+      });
+
+      // Remove duplicates
+      if (allConcepts.length > 0) {
+        concepts = [...new Set(allConcepts)];
+      }
+    }
+
+    if (!concepts || concepts.length === 0) return null;
+
+    // Transform simple string arrays into objects
+    return concepts.map(item => {
+      if (typeof item === 'string') {
+        return { term: item, description: undefined };
+      }
+      return item;
     });
   }
 }

@@ -9,6 +9,7 @@ from app.services.embedder import EmbedderService
 from app.services.youtube import YouTubeService
 from app.services.llm_client import get_llm_client, reset_client
 from config.settings import settings
+from app.utils.archive import archive_file
 import os
 import logging
 import time
@@ -63,6 +64,11 @@ def process_document_task(self, document_id: str):
                          "title": info["title"]  # Redundant but useful for RAG context standardized keys
                      }
                      logger.info(f"YouTube download complete: {doc.file_path}")
+
+                     # Archive downloaded YouTube audio if enabled
+                     youtube_audio_path = os.path.join(settings.UPLOAD_FOLDER, doc.file_path)
+                     if archive_file(youtube_audio_path, doc.file_path, 'youtube'):
+                         logger.info(f"YouTube audio archived: {doc.file_path}")
                 
                 # Now treat as audio
                 full_path = os.path.join(settings.UPLOAD_FOLDER, doc.file_path)

@@ -1,7 +1,8 @@
-import { Component, input, effect, signal, inject, ViewEncapsulation, output } from '@angular/core';
+import { Component, input, effect, signal, inject, ViewEncapsulation, output, ElementRef, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { marked } from 'marked';
+import katex from 'katex';
 
 @Component({
     selector: 'app-markdown-display',
@@ -127,12 +128,14 @@ import { marked } from 'marked';
   `],
     encapsulation: ViewEncapsulation.None
 })
-export class MarkdownDisplayComponent {
+export class MarkdownDisplayComponent implements AfterViewChecked {
     content = input.required<string>();
     citationClick = output<string>();
     sanitizer = inject(DomSanitizer);
+    elementRef = inject(ElementRef);
 
     sanitizedContent = signal<SafeHtml>('');
+    private lastRenderedContent = '';
 
     constructor() {
         effect(async () => {
@@ -152,6 +155,43 @@ export class MarkdownDisplayComponent {
             });
 
             this.sanitizedContent.set(this.sanitizer.bypassSecurityTrustHtml(html));
+            this.lastRenderedContent = raw;
+        });
+    }
+
+    ngAfterViewChecked() {
+        if (this.content() === this.lastRenderedContent) {
+            this.renderMath();
+        }
+    }
+
+    private renderMath() {
+        const element = this.elementRef.nativeElement;
+        const mathElements = element.querySelectorAll('.markdown-content');
+
+        mathElements.forEach((el: HTMLElement) => {
+            // Process inline math: $...$
+            let html = el.innerHTML;
+
+            // Replace display math $$...$$ first (to avoid conflicts with inline)
+            html = html.replace(/\$\$([^\$]+)\$\$/g, (match, math) => {
+                try {
+                    return katex.renderToString(math, { displayMode: true, throwOnError: false });
+                } catch (e) {
+                    return match;
+                }
+            });
+
+            // Replace inline math $...$
+            html = html.replace(/\$([^\$]+)\$/g, (match, math) => {
+                try {
+                    return katex.renderToString(math, { displayMode: false, throwOnError: false });
+                } catch (e) {
+                    return match;
+                }
+            });
+
+            el.innerHTML = html;
         });
     }
 

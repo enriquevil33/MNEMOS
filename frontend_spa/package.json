@@ -34,6 +34,7 @@
     "animejs": "^3.2.2",
     "cytoscape": "^3.33.1",
     "daisyui": "^4.4.19",
+    "katex": "^0.16.28",
     "marked": "^17.0.1",
     "ngx-extended-pdf-viewer": "^25.6.4",
     "ngx-toastr": "^19.1.0",

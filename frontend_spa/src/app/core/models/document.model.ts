@@ -27,3 +27,12 @@ export interface DocumentUploadResponse {
   file_type: string;
   status: string;
 }
+
+export interface DocumentSection {
+  id: string;
+  title: string;
+  content: string;
+  start_page?: number;
+  end_page?: number;
+  metadata?: any;
+}

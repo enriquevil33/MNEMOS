@@ -44,5 +44,6 @@ class DocumentSection(db.Model):
             "title": self.title,
             "content": self.content,
             "start_page": self.start_page,
-            "end_page": self.end_page
+            "end_page": self.end_page,
+            "metadata": self.metadata_
         }

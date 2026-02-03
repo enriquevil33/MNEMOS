@@ -90,7 +90,20 @@
         <!-- Content -->
         <div class="flex-1 overflow-y-auto p-2">
             @if (activeTab() === 'chats') {
-            <div class="text-xs font-medium text-secondary mb-2 px-2">Conversations</div>
+            <!-- Collection Selector -->
+            <div class="mb-3 px-2">
+                <label class="block text-xs font-medium text-secondary mb-2">Context Collection</label>
+                <select [(ngModel)]="selectedCollectionId" (change)="handleSelectCollection($any($event.target).value)"
+                        class="w-full px-2 py-1.5 text-xs bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
+                    <option [ngValue]="null">All Documents</option>
+                    @for (col of collections(); track col.id) {
+                        <option [value]="col.id">{{ col.name }}</option>
+                    }
+                </select>
+                <p class="text-xs text-secondary mt-1.5 opacity-70">Selected collection documents will be used for chat context</p>
+            </div>
+
+            <div class="text-xs font-medium text-secondary mb-2 px-2 border-t border-divider pt-3">Conversations</div>
             @for (conv of conversationsService.conversations(); track conv.id) {
             <div class="group relative">
                 <button (click)="handleSelectConversation(conv.id); isSidebarOpen.set(false)"
@@ -263,9 +276,9 @@
 <!-- Modal: Upload Document -->
 @if (modalService.isUploadOpen()) {
 <div class="modal modal-open">
-    <div class="modal-box bg-panel border border-divider rounded-2xl p-0 max-w-lg">
+    <div class="modal-box bg-panel border border-divider rounded-2xl p-0 max-w-lg md:max-w-2xl w-full mx-4">
         <div class="p-4 border-b border-divider">
-            <h3 class="text-lg font-semibold text-primary">Upload Document</h3>
+            <h3 class="text-lg font-semibold text-primary">Upload Documents</h3>
         </div>
 
         <!-- Tabs -->
@@ -288,29 +301,100 @@
             <!-- File Upload Tab -->
             @if (uploadTab() === 'file') {
             <div (dragover)="onDragOver($event)" (drop)="onDrop($event)"
-                class="border-2 border-dashed border-divider rounded-xl p-8 text-center hover:border-accent transition-colors cursor-pointer relative">
+                class="border-2 border-dashed border-divider rounded-xl p-6 sm:p-8 text-center hover:border-accent transition-colors cursor-pointer relative">
 
-                <input type="file" (change)="onFileSelected($event)"
+                <input type="file" multiple (change)="onFileSelected($event)"
                     class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
 
-                <svg class="w-12 h-12 mx-auto text-secondary mb-3" fill="none" stroke="currentColor"
+                <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-secondary mb-3" fill="none" stroke="currentColor"
                     viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                <p class="text-sm text-primary mb-1">
-                    {{ selectedFile() ? selectedFile()?.name : 'Drop files here or click to browse' }}
+                <p class="text-xs sm:text-sm text-primary mb-1">
+                    Drop files here or click to browse
                 </p>
-                <p class="text-xs text-secondary">PDF, TXT, Audio, Video (Max 10MB)</p>
+                <p class="text-xs text-secondary">PDF, EPUB, Audio, Video (Max 50GB)</p>
             </div>
+
+            <!-- Selected Files List -->
+            @if (selectedFiles().length > 0) {
+            <div class="mt-4 space-y-2">
+                <div class="text-sm font-medium text-secondary">
+                    Selected Files ({{ selectedFiles().length }})
+                </div>
+
+                @for (file of selectedFiles(); track $index) {
+                <div class="flex items-center justify-between gap-2 sm:gap-3 p-2 sm:p-3 bg-hover rounded-lg transition-colors hover:bg-input">
+                    <!-- File icon + info -->
+                    <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+
+                        <div class="min-w-0 flex-1">
+                            <div class="text-xs sm:text-sm font-medium text-primary truncate">
+                                {{ file.name }}
+                            </div>
+                            <div class="text-xs text-secondary">
+                                {{ formatFileSize(file.size) }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Remove button -->
+                    <button (click)="removeFile($index)" type="button"
+                        class="p-1.5 text-error hover:bg-error/10 rounded transition-colors flex-shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                }
+            </div>
+            }
             }
 
             <!-- YouTube Tab -->
             @if (uploadTab() === 'youtube') {
             <div>
-                <input type="text" [(ngModel)]="youtubeUrl" placeholder="https://youtube.com/watch?v=..."
-                    class="w-full px-3 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent mb-3">
-                <p class="text-xs text-secondary">Enter a YouTube URL to transcribe and analyze the video</p>
+                <textarea [(ngModel)]="youtubeUrlsText" (input)="parseYouTubeUrls($event)"
+                    placeholder="Paste YouTube URLs (one per line)&#10;https://youtube.com/watch?v=...&#10;https://youtube.com/watch?v=..."
+                    rows="4"
+                    class="w-full px-3 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-sm text-primary placeholder:text-secondary resize-none"></textarea>
+                <p class="text-xs text-secondary mt-2">Enter YouTube URLs to transcribe and analyze (one per line)</p>
+
+                <!-- Parsed YouTube URLs List -->
+                @if (youtubeUrls().length > 0) {
+                <div class="mt-4 space-y-2">
+                    <div class="text-sm font-medium text-secondary">
+                        URLs to Upload ({{ youtubeUrls().length }})
+                    </div>
+
+                    @for (url of youtubeUrls(); track $index) {
+                    <div class="flex items-center justify-between gap-3 p-3 bg-hover rounded-lg transition-colors hover:bg-input">
+                        <!-- YouTube icon + URL -->
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                            <svg class="w-5 h-5 flex-shrink-0 text-error" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                            </svg>
+                            <div class="text-sm text-primary truncate flex-1">
+                                {{ url }}
+                            </div>
+                        </div>
+
+                        <!-- Remove button -->
+                        <button (click)="removeYouTubeUrl($index)" type="button"
+                            class="p-1.5 text-error hover:bg-error/10 rounded transition-colors flex-shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    }
+                </div>
+                }
             </div>
             }
 
@@ -324,17 +408,41 @@
                 <progress class="progress progress-accent w-full" [value]="uploadProgress()" max="100"></progress>
             </div>
             }
+
+            <!-- Archive Toggle -->
+            <div class="mt-4 pt-4 border-t border-divider">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <label class="text-sm font-medium text-primary cursor-pointer">Archive Files</label>
+                        <p class="text-xs text-secondary mt-0.5">Keep a persistent copy organized by format</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" [(ngModel)]="settingsService.chatPreferences()!.archive_enabled"
+                            (ngModelChange)="toggleArchive()"
+                            class="sr-only peer">
+                        <div class="w-11 h-6 bg-input peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+                    </label>
+                </div>
+            </div>
         </div>
 
-        <div class="flex gap-2 p-4 border-t border-divider">
+        <div class="flex flex-col sm:flex-row gap-2 p-4 border-t border-divider">
             <button (click)="modalService.closeUpload()"
-                class="flex-1 px-4 py-2 text-sm text-secondary hover:bg-hover rounded-lg transition-colors">
+                class="w-full sm:flex-1 px-4 py-2 text-sm text-secondary hover:bg-hover rounded-lg transition-colors">
                 Cancel
             </button>
             <button (click)="startUpload()"
-                [disabled]="isUploading() || (uploadTab() === 'file' && !selectedFile()) || (uploadTab() === 'youtube' && !youtubeUrl())"
-                class="flex-1 px-4 py-2 text-sm bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                {{ isUploading() ? 'Uploading...' : 'Upload' }}
+                [disabled]="isUploading() || (uploadTab() === 'file' && selectedFiles().length === 0) || (uploadTab() === 'youtube' && youtubeUrls().length === 0)"
+                class="w-full sm:flex-1 px-4 py-2 text-sm bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                @if (isUploading()) {
+                    Uploading... {{ uploadProgress() }}%
+                } @else if (uploadTab() === 'file' && selectedFiles().length > 0) {
+                    Upload {{ selectedFiles().length }} File{{ selectedFiles().length !== 1 ? 's' : '' }}
+                } @else if (uploadTab() === 'youtube' && youtubeUrls().length > 0) {
+                    Upload {{ youtubeUrls().length }} URL{{ youtubeUrls().length !== 1 ? 's' : '' }}
+                } @else {
+                    Upload
+                }
             </button>
         </div>
     </div>

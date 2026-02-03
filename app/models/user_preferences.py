@@ -63,6 +63,9 @@ class UserPreferences(db.Model):
     openai_tts_model = db.Column(db.String(50), default='tts-1', nullable=True)
     openai_stt_model = db.Column(db.String(50), default='whisper-1', nullable=True)
 
+    # Archive Settings
+    archive_enabled = db.Column(db.Boolean, default=False, nullable=False)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -105,6 +108,7 @@ class UserPreferences(db.Model):
             'tts_enabled': self.tts_enabled,
             'openai_tts_model': self.openai_tts_model,
             'openai_stt_model': self.openai_stt_model,
+            'archive_enabled': self.archive_enabled,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }

@@ -2,9 +2,11 @@ import logging
 from flask import Blueprint, request, render_template, jsonify, send_from_directory, Response
 from werkzeug.utils import secure_filename
 from app.models.document import Document
+from app.models.section import DocumentSection
 from app.tasks.processing import process_document_task
 from app.extensions import db
 from config.settings import settings
+from app.utils.archive import archive_file
 import os
 from uuid import uuid4
 
@@ -72,6 +74,10 @@ def upload_document():
         file.save(file_path_disk)
         logger.info(f"File saved to {file_path_disk}")
         doc.file_path = doc.filename
+
+        # Archive file if enabled
+        if archive_file(file_path_disk, saved_filename, doc.file_type):
+            logger.info(f"File archived: {saved_filename}")
         
     elif youtube_url:
         logger.info(f"Processing YouTube URL: {youtube_url}")
@@ -159,12 +165,39 @@ def get_document_content(doc_id):
     doc = db.session.query(Document).get(doc_id)
     if not doc or not doc.file_path:
         return "", 404
-    
+
     # Ensure it's not a youtube "file" (which are URLs)
     if doc.file_type == 'youtube':
         return "", 400
 
     return send_from_directory(settings.UPLOAD_FOLDER, doc.file_path)
+
+@bp.route('/<string:doc_id>/sections', methods=['GET'])
+def get_document_sections(doc_id):
+    """Get all sections for a document with full details."""
+    logger.info(f"Fetching sections for document {doc_id}")
+
+    doc = db.session.query(Document).get(doc_id)
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+
+    sections = db.session.query(DocumentSection).filter(
+        DocumentSection.document_id == doc_id
+    ).order_by(DocumentSection.start_page).all()
+
+    sections_data = []
+    for section in sections:
+        section_dict = {
+            "id": str(section.id),
+            "title": section.title,
+            "content": section.content,
+            "start_page": section.start_page,
+            "end_page": section.end_page,
+            "metadata": section.metadata_
+        }
+        sections_data.append(section_dict)
+
+    return jsonify(sections_data)
 
 @bp.route('/<string:doc_id>', methods=['PUT'])
 def update_document(doc_id):

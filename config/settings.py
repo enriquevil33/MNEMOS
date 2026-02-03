@@ -79,6 +79,7 @@ class Settings(BaseSettings):
     # Default to a local 'uploads' directory for Windows dev
     UPLOAD_FOLDER: str = os.path.join(os.getcwd(), 'uploads') if os.name == 'nt' else "/app/uploads"
     TRANSCRIPTION_FOLDER: str = os.path.join(UPLOAD_FOLDER, 'transcriptions')
+    ARCHIVE_FOLDER: str = os.path.join(os.getcwd(), 'archive') if os.name == 'nt' else "/app/archive"
     MAX_CONTENT_LENGTH: int = 50 * 1024 * 1024 * 1024  # 50GB
     
     class Config:

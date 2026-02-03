@@ -7,6 +7,7 @@ import { ModalService } from '../../services/modal.service';
 import { DocumentsService } from '../../services/documents.service';
 import { ConversationsService } from '../../services/conversations.service';
 import { ChatService } from '../../services/chat.service';
+import { CollectionService } from '../../services/collection.service';
 import { FullscreenModalComponent } from '../../components/loaders/fullscreen-modal/fullscreen-modal.component';
 import { SettingsService } from '../../services/settings.service';
 import { ToastrService } from 'ngx-toastr';
@@ -28,6 +29,7 @@ export class MainLayout implements OnInit {
   documentsService = inject(DocumentsService);
   conversationsService = inject(ConversationsService);
   chatService = inject(ChatService);
+  collectionService = inject(CollectionService);
   settingsService = inject(SettingsService);
   public toastr = inject(ToastrService);
   protected readonly AppRoutes = AppRoutes;
@@ -38,12 +40,17 @@ export class MainLayout implements OnInit {
   activeTab = signal<'chats' | 'documents'>('chats');
   isInitialLoading = signal<boolean>(true);
 
+  // Collection selector
+  selectedCollectionId = signal<string | null>(null);
+  collections = signal<any[]>([]);
+
   // Upload Modal State
   uploadTab = signal<'file' | 'youtube'>('file');
   uploadProgress = signal<number>(0);
   isUploading = signal<boolean>(false);
-  selectedFile = signal<File | null>(null);
-  youtubeUrl = signal<string>('');
+  selectedFiles = signal<File[]>([]);
+  youtubeUrls = signal<string[]>([]);
+  youtubeUrlsText = signal<string>('');
 
   constructor() {
     // Load saved theme
@@ -72,7 +79,8 @@ export class MainLayout implements OnInit {
         this.settingsService.loadModels(),
         this.settingsService.loadCurrentModel(),
         this.settingsService.loadChatPreferences(),
-        this.settingsService.loadConnections()
+        this.settingsService.loadConnections(),
+        this.loadCollections()
       ]);
       this.toastr.success('Initial data loaded successfully');
     } catch (error) {
@@ -81,6 +89,35 @@ export class MainLayout implements OnInit {
     } finally {
       this.isInitialLoading.set(false);
     }
+  }
+
+  async loadCollections() {
+    this.collectionService.getCollections().subscribe({
+      next: (cols) => this.collections.set(cols),
+      error: (err) => console.error('Failed to load collections', err)
+    });
+  }
+
+  async handleSelectCollection(collectionId: string | null) {
+    this.selectedCollectionId.set(collectionId);
+
+    // Clear current document selection
+    this.documentsService.clearSelection();
+
+    if (collectionId === null) {
+      // "All Documents" selected - no documents selected for chat context
+      return;
+    }
+
+    // Get all documents in the selected collection and select them
+    const allDocs = this.documentsService.documents();
+    const collectionDocs = allDocs.filter(doc => doc.collection_id === collectionId);
+
+    collectionDocs.forEach(doc => {
+      this.documentsService.toggleDocument(doc.id);
+    });
+
+    this.toastr.info(`${collectionDocs.length} document(s) from collection will be used for chat context`);
   }
 
   toggleTheme() {
@@ -153,7 +190,10 @@ export class MainLayout implements OnInit {
   onFileSelected(event: Event) {
     const input = event.target as HTMLInputElement;
     if (input.files?.length) {
-      this.selectedFile.set(input.files[0]);
+      // Add all selected files to the array
+      this.selectedFiles.update(files => [...files, ...Array.from(input.files!)]);
+      // Reset input to allow selecting the same file again
+      input.value = '';
     }
   }
 
@@ -167,43 +207,137 @@ export class MainLayout implements OnInit {
     event.preventDefault();
     event.stopPropagation();
     if (event.dataTransfer?.files.length) {
-      this.selectedFile.set(event.dataTransfer.files[0]);
+      // Add all dropped files to the array
+      this.selectedFiles.update(files => [...files, ...Array.from(event.dataTransfer!.files)]);
+    }
+  }
+
+  removeFile(index: number) {
+    this.selectedFiles.update(files => files.filter((_, i) => i !== index));
+  }
+
+  parseYouTubeUrls(event: Event) {
+    const textarea = event.target as HTMLTextAreaElement;
+    const text = textarea.value;
+    this.youtubeUrlsText.set(text);
+
+    // Parse URLs from textarea (one per line)
+    const urls = text
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+
+    this.youtubeUrls.set(urls);
+  }
+
+  removeYouTubeUrl(index: number) {
+    // Remove from array
+    this.youtubeUrls.update(urls => urls.filter((_, i) => i !== index));
+    // Update textarea text
+    this.youtubeUrlsText.set(this.youtubeUrls().join('\n'));
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  }
+
+  async toggleArchive() {
+    // Save preferences immediately when toggle changes
+    try {
+      await this.settingsService.saveChatPreferences({
+        archive_enabled: this.settingsService.chatPreferences()!.archive_enabled
+      });
+      this.toastr.success('Archive setting saved');
+    } catch (error) {
+      this.toastr.error('Failed to save archive setting');
     }
   }
 
   async startUpload() {
-    if (!this.selectedFile() && this.uploadTab() === 'file') return;
-    if (!this.youtubeUrl() && this.uploadTab() === 'youtube') return;
+    const hasFiles = this.selectedFiles().length > 0;
+    const hasUrls = this.youtubeUrls().length > 0;
+
+    if (!hasFiles && this.uploadTab() === 'file') return;
+    if (!hasUrls && this.uploadTab() === 'youtube') return;
 
     this.isUploading.set(true);
-    this.uploadProgress.set(10); // Start progress
+    this.uploadProgress.set(0);
 
     try {
-      let success = false;
+      let successCount = 0;
+      let failedCount = 0;
 
       if (this.uploadTab() === 'youtube') {
-        success = await this.documentsService.uploadYouTubeUrl(this.youtubeUrl());
-      } else if (this.selectedFile()) {
-        success = await this.documentsService.uploadDocument(this.selectedFile()!);
+        const urls = this.youtubeUrls();
+        const total = urls.length;
+
+        for (let i = 0; i < total; i++) {
+          const url = urls[i];
+          const success = await this.documentsService.uploadYouTubeUrl(url);
+
+          if (success) {
+            successCount++;
+          } else {
+            failedCount++;
+          }
+
+          // Update progress
+          this.uploadProgress.set(Math.round(((i + 1) / total) * 100));
+        }
+
+        // Show summary
+        if (successCount > 0) {
+          this.toastr.success(`${successCount} YouTube video${successCount > 1 ? 's' : ''} uploaded successfully`);
+        }
+        if (failedCount > 0) {
+          this.toastr.error(`${failedCount} upload${failedCount > 1 ? 's' : ''} failed`);
+        }
+
+      } else {
+        const files = this.selectedFiles();
+        const total = files.length;
+
+        for (let i = 0; i < total; i++) {
+          const file = files[i];
+          const success = await this.documentsService.uploadDocument(file);
+
+          if (success) {
+            successCount++;
+          } else {
+            failedCount++;
+          }
+
+          // Update progress
+          this.uploadProgress.set(Math.round(((i + 1) / total) * 100));
+        }
+
+        // Show summary
+        if (successCount > 0) {
+          this.toastr.success(`${successCount} file${successCount > 1 ? 's' : ''} uploaded successfully`);
+        }
+        if (failedCount > 0) {
+          this.toastr.error(`${failedCount} upload${failedCount > 1 ? 's' : ''} failed`);
+        }
       }
 
-      if (success) {
-        this.uploadProgress.set(100);
-        setTimeout(() => {
-          this.isUploading.set(false);
-          this.modalService.closeUpload();
-          this.uploadProgress.set(0);
-          this.selectedFile.set(null);
-          this.youtubeUrl.set(''); // Reset URL
-        }, 500);
-      } else {
+      // Reset and close
+      setTimeout(() => {
         this.isUploading.set(false);
+        this.modalService.closeUpload();
         this.uploadProgress.set(0);
-        // Handle error state
-      }
+        this.selectedFiles.set([]);
+        this.youtubeUrls.set([]);
+        this.youtubeUrlsText.set('');
+      }, 500);
+
     } catch (error) {
       console.error(error);
       this.isUploading.set(false);
+      this.toastr.error('Upload failed. Please try again.');
     }
   }
 }
