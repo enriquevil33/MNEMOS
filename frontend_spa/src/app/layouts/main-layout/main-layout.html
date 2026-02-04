@@ -27,7 +27,19 @@
     <main class="flex-1 flex flex-col bg-base relative w-full h-full overflow-hidden">
         <!-- Mobile Header -->
         <div class="lg:hidden flex items-center justify-between p-4 border-b border-divider bg-sidebar">
-            <h1 class="text-lg font-bold text-primary">MNEMOS</h1>
+            <div class="flex items-center gap-2">
+                <button (click)="toggleTheme()" title="Toggle theme"
+                    class="w-5 h-5 rounded-full hover:scale-110 transition-transform animate-pulse-subtle flex-shrink-0">
+                    <svg viewBox="0 0 100 100" class="w-full h-full">
+                        <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="4" class="text-secondary"/>
+                        <path d="M50,4 A46,46 0 0,0 50,96 A23,23 0 0,1 50,50 A23,23 0 0,0 50,4 Z" fill="currentColor" class="text-primary"/>
+                        <path d="M50,4 A46,46 0 0,1 50,96 A23,23 0 0,0 50,50 A23,23 0 0,1 50,4 Z" fill="currentColor" class="text-sidebar"/>
+                        <circle cx="50" cy="73" r="7" fill="currentColor" class="text-primary"/>
+                        <circle cx="50" cy="27" r="7" fill="currentColor" class="text-sidebar"/>
+                    </svg>
+                </button>
+                <h1 class="text-lg font-bold text-primary font-brand">MNEMOS</h1>
+            </div>
             <button (click)="toggleSidebar()" class="p-2 -mr-2 text-secondary hover:text-primary">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -47,7 +59,19 @@
     <!-- Sidebar Header -->
     <div class="p-4 border-b border-divider">
         <div class="flex items-center justify-between mb-4">
-            <h1 class="text-lg font-bold text-primary">MNEMOS</h1>
+            <div class="flex items-center gap-2">
+                <button (click)="toggleTheme()" title="Toggle theme"
+                    class="w-5 h-5 rounded-full hover:scale-110 transition-transform animate-pulse-subtle flex-shrink-0">
+                    <svg viewBox="0 0 100 100" class="w-full h-full">
+                        <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" stroke-width="4" class="text-secondary"/>
+                        <path d="M50,4 A46,46 0 0,0 50,96 A23,23 0 0,1 50,50 A23,23 0 0,0 50,4 Z" fill="currentColor" class="text-primary"/>
+                        <path d="M50,4 A46,46 0 0,1 50,96 A23,23 0 0,0 50,50 A23,23 0 0,1 50,4 Z" fill="currentColor" class="text-sidebar"/>
+                        <circle cx="50" cy="73" r="7" fill="currentColor" class="text-primary"/>
+                        <circle cx="50" cy="27" r="7" fill="currentColor" class="text-sidebar"/>
+                    </svg>
+                </button>
+                <h1 class="text-lg font-bold text-primary font-brand">MNEMOS</h1>
+            </div>
             <div class="flex items-center gap-2">
                 <button class="p-2 hover:bg-hover rounded-lg transition-colors" title="New Chat"
                     (click)="handleNewChat(); isSidebarOpen.set(false)">
@@ -251,22 +275,6 @@
                     d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             </svg>
             <span>Settings</span>
-        </button>
-        <button (click)="toggleTheme()"
-            class="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary hover:bg-hover rounded-lg transition-colors">
-            @if (theme() === 'dark') {
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-            </svg>
-            <span>Dark Mode</span>
-            } @else {
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-            <span>Light Mode</span>
-            }
         </button>
     </div>
 </ng-template>

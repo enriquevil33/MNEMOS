@@ -17,7 +17,7 @@ import { CommonModule } from '@angular/common';
                     class="absolute inset-0 border-4 border-accent border-t-transparent rounded-full animate-spin">
                 </div>
             </div>
-            <div class="text-2xl font-bold text-primary tracking-widest animate-pulse">MNEMOS</div>
+            <div class="text-2xl font-bold text-primary tracking-widest animate-pulse font-brand">MNEMOS</div>
         </div>
     </div>
   `

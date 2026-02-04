@@ -9,10 +9,12 @@
 
 /* Font Face */
 @font-face {
-    font-family: 'Space Grotesk';
-    src: url('/fonts/SpaceGrotesk-Regular.ttf') format('truetype');
-    font-weight: 400;
+    font-family: 'Bodoni Moda SC';
+    src: url('/fonts/BodoniModaSC.woff2') format('woff2');
+    font-weight: 400 900;
     font-style: normal;
+    font-optical-sizing: auto;
+    font-display: swap;
 }
 
 /* ============================================
@@ -82,6 +84,12 @@
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
 }
 
+/* Brand utility — optical sizing for Bodoni Moda SC at display sizes */
+.font-brand {
+    font-family: 'Bodoni Moda SC', serif;
+    font-optical-sizing: auto;
+}
+
 /* ============================================
    BASE STYLES
    ============================================ */
@@ -93,7 +101,7 @@
 }
 
 body {
-    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+    font-family: 'Bodoni Moda SC', serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background-color: var(--color-base);
@@ -291,6 +299,15 @@ textarea {
     50% {
         opacity: 0.5;
     }
+}
+
+@keyframes pulse-subtle {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.animate-pulse-subtle {
+    animation: pulse-subtle 3s ease-in-out infinite;
 }
 
 .anime-fade-in {
