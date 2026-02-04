@@ -47,7 +47,7 @@ import anime from 'animejs/lib/anime.es.js';
     
     .status-text {
         color: white;
-        font-family: monospace;
+        font-family: var(--font-mono);
         font-size: 1.5rem;
         letter-spacing: 4px;
         text-transform: uppercase;
@@ -56,7 +56,7 @@ import anime from 'animejs/lib/anime.es.js';
     }
     
     .transcript-text {
-        font-family: 'Inter', sans-serif;
+        font-family: var(--font-ui);
         color: #888;
         font-size: 1rem;
         background: rgba(0,0,0,0.5);

@@ -63,14 +63,14 @@ import katex from 'katex';
       padding: 1em;
       overflow-x: auto;
       margin-bottom: 1em;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: var(--font-mono);
     }
     .markdown-content code {
       background-color: rgba(255, 255, 255, 0.1);
       padding: 0.2em 0.4em;
       border-radius: 0.25rem;
       font-size: 0.85em;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: var(--font-mono);
     }
     .markdown-content pre code {
       background-color: transparent;

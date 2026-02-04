@@ -8,6 +8,8 @@
    ============================================ */
 
 /* Font Face */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+
 @font-face {
     font-family: 'Bodoni Moda SC';
     src: url('/fonts/BodoniModaSC.woff2') format('woff2');
@@ -17,12 +19,18 @@
     font-display: swap;
 }
 
+
 /* ============================================
    CSS VARIABLES - THEME SYSTEM
    ============================================ */
 
 [data-theme="mnemos-dark"],
 :root {
+    /* Fonts */
+    --font-brand: 'Bodoni Moda SC', serif;
+    --font-ui: Roboto, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
     /* Color Palette */
     --color-base: #0d0d0d;
     --color-base-subtle: #171717;
@@ -38,9 +46,9 @@
     --color-primary: #ffffff;
     --color-secondary: #a0a0a0;
 
-    --color-accent: #3b82f6;
+    --color-accent: #3985ff;
     --color-accent-content: #ffffff;
-    --color-accent-dark: #2563eb;
+    --color-accent-dark: #1a3571;
     --color-accent-subtle: rgba(59, 130, 246, 0.1);
 
     --color-success: #10b981;
@@ -68,9 +76,9 @@
     --color-primary: #000000;
     --color-secondary: #4a4a4a;
 
-    --color-accent: #3b82f6;
+    --color-accent: #92bcff;
     --color-accent-content: #ffffff;
-    --color-accent-dark: #2563eb;
+    --color-accent-dark: #224a9f;
     --color-accent-subtle: rgba(59, 130, 246, 0.1);
 
     --color-success: #10b981;
@@ -86,7 +94,7 @@
 
 /* Brand utility — optical sizing for Bodoni Moda SC at display sizes */
 .font-brand {
-    font-family: 'Bodoni Moda SC', serif;
+    font-family: var(--font-brand);
     font-optical-sizing: auto;
 }
 
@@ -101,7 +109,7 @@
 }
 
 body {
-    font-family: 'Bodoni Moda SC', serif;
+    font-family: var(--font-ui);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background-color: var(--color-base);
@@ -308,6 +316,16 @@ textarea {
 
 .animate-pulse-subtle {
     animation: pulse-subtle 3s ease-in-out infinite;
+}
+
+@keyframes hue-spin {
+    to {
+        filter: hue-rotate(360deg);
+    }
+}
+
+.hue-rotate {
+    animation: hue-spin 73s linear infinite;
 }
 
 .anime-fade-in {
