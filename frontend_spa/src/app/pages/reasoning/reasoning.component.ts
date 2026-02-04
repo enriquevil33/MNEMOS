@@ -7,7 +7,7 @@ import { CollectionService } from '../../services/collection.service';
 import { ConversationsService } from '../../services/conversations.service';
 import { Collection } from '../../core/models/collection.model';
 import { GraphVisualizerComponent } from '../../shared/components/graph-visualizer/graph-visualizer.component';
-import { ConfirmationModalComponent } from '../../shared/components/confirmation-modal/confirmation-modal.component';
+import { ConfirmationModalComponent } from '../../shared/components/confirmation-modal.component/confirmation-modal.component';
 import { Router } from '@angular/router';
 
 @Component({

@@ -96,21 +96,52 @@ def reprocess_all():
     if REPROCESSING_STATUS["status"] == "processing":
          return jsonify({"status": "processing", "message": "Already reprocessing..."})
 
+    data = request.json or {}
+    missing_only = data.get('missing_only', False)
+
     REPROCESSING_STATUS["status"] = "processing"
-    
-    # Run in background due to potentially long running time
+
+    # Capture app context for the background thread
+    from flask import current_app
+    app = current_app._get_current_object()
+
     import threading
     def run_reprocess():
         global REPROCESSING_STATUS
-        try:
-            logger.info("Starting reprocessing...")
-            engine = ReasoningEngine()
-            engine.build_graph() # Assuming this method exists and rebuilds everything
-            logger.info("Reprocessing complete.")
-        except Exception as e:
-            logger.error(f"Reprocessing failed: {e}")
-        finally:
-            REPROCESSING_STATUS["status"] = "idle"
+        with app.app_context():
+            try:
+                from app.extensions import db
+                from app.models.document import Document
+                from app.services.hypergraph_extractor import HypergraphExtractor
+
+                documents = db.session.query(Document).filter(Document.status == 'completed').all()
+
+                if missing_only:
+                    # Skip documents that already have hyper_edges
+                    docs_with_edges = db.session.query(Document.id).filter(
+                        Document.hyper_edges.any()
+                    ).all()
+                    already_processed = {str(row[0]) for row in docs_with_edges}
+                    documents = [d for d in documents if str(d.id) not in already_processed]
+                    logger.info(f"Missing-only mode: {len(documents)} documents to process (skipping {len(already_processed)} already extracted).")
+                else:
+                    # Full rebuild: delete all existing hypergraph data first
+                    from app.models.knowledge_graph import HyperEdgeMember, HyperEdge, Concept
+                    db.session.query(HyperEdgeMember).delete()
+                    db.session.query(HyperEdge).delete()
+                    db.session.query(Concept).delete()
+                    db.session.commit()
+                    logger.info(f"Full rebuild: cleared hypergraph. Processing {len(documents)} documents.")
+
+                for i, doc in enumerate(documents):
+                    logger.info(f"[Reprocess] Extracting hypergraph for document {i+1}/{len(documents)}: {doc.original_filename} ({doc.id})")
+                    HypergraphExtractor.process_document(str(doc.id))
+
+                logger.info("Reprocessing complete.")
+                REPROCESSING_STATUS["status"] = "completed"
+            except Exception as e:
+                logger.error(f"Reprocessing failed: {e}")
+                REPROCESSING_STATUS["status"] = "failed"
 
     thread = threading.Thread(target=run_reprocess)
     thread.start()

@@ -89,7 +89,7 @@ def chat():
     result = rag.query(
         question=question,
         document_ids=doc_ids,
-        top_k=5,
+        top_k=10,
         conversation_history=conversation_history,
         system_prompt=system_prompt,
         web_search=web_search,

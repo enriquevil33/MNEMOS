@@ -85,6 +85,7 @@ class HypergraphExtractor:
                 
                 Rules:
                 - Use precise technical terms.
+                - IMPORTANT: Keep concept names and relations in the SAME LANGUAGE as the source text. Do NOT translate them to English.
                 - Normalize names (e.g., "this protein" -> "Protein X").
                 - Capture up to 10 most important events per batch.
                 

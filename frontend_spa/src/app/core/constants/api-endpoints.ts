@@ -50,5 +50,5 @@ export const ApiEndpoints = {
 
   // Reasoning
   REASONING_TRAVERSE: '/api/reasoning/traverse',
-  REASONING_REPROCESS: '/api/documents/reprocess-hypergraph',
+  REASONING_REPROCESS: '/api/reasoning/reprocess',
 } as const;

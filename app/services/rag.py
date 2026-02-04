@@ -165,50 +165,72 @@ Output ONLY the queries, one per line. Do not include numbering or bullets."""
         return list(unique_content.values())
 
     def search_similar_chunks(
-        self, 
-        query: str, 
+        self,
+        query: str,
         document_ids: List[str] = None,
-        top_k: int = 5
+        top_k: int = 10
     ) -> List[Chunk]:
         """
-        Hybrid search on chunks (Vector + Full Text).
-        Combines Cosine Similarity (70%) and Keyword Rank (30%).
+        Hybrid retrieval via Reciprocal Rank Fusion (RRF).
+        Runs vector and keyword searches independently, each returning top_k results,
+        then merges them by RRF score. This prevents keyword hits from being drowned
+        out by the different score scales of ts_rank vs cosine similarity.
         """
         from sqlalchemy import func, desc
-        
+        import logging
+        logger = logging.getLogger(__name__)
+
         query_embedding = self.embedder.embed(query)
         pg_lang = self._detect_query_language(query)
-        
-        # 1. Similarity Score (1 - Distance)
-        # Cosine distance is usually 0 (same) to 2 (opposite).
-        # We want similarity: 1.0 is match, 0.0 is orthogonal/opposite.
+
+        base_filter = Chunk.document_id.in_(document_ids) if document_ids else None
+
+        # --- Pass 1: Vector search ---
         similarity = 1 - Chunk.embedding.cosine_distance(query_embedding)
-        
-        # 2. Keyword Score (TS Rank)
-        # websearch_to_tsquery handles natural language better than plain to_tsquery
-        kw_query = func.websearch_to_tsquery(pg_lang, query)
+        stmt_vec = select(Chunk)
+        if base_filter is not None:
+            stmt_vec = stmt_vec.where(base_filter)
+        stmt_vec = stmt_vec.order_by(desc(similarity)).limit(top_k)
+        vec_results = self.db.execute(stmt_vec).scalars().all()
+
+        # --- Pass 2: Keyword search ---
+        kw_query = func.plainto_tsquery(pg_lang, query)
         rank = func.ts_rank_cd(Chunk.search_vector, kw_query)
-        
-        # 3. Hybrid Score
-        # Adjust weights as needed (0.7 / 0.3 is a standard starting point)
-        hybrid_score = (similarity * 0.7) + (rank * 0.3)
-        
-        stmt = select(Chunk).add_columns(hybrid_score.label("score"))
-        
-        if document_ids:
-             stmt = stmt.where(Chunk.document_id.in_(document_ids))
-             
-        stmt = stmt.order_by(desc(hybrid_score)).limit(top_k)
-        
-        # Execute and unpack (Chunk, score) tuples
-        results = self.db.execute(stmt).all()
-        return [row[0] for row in results]
+        stmt_kw = select(Chunk).add_columns(rank.label("kw_score"))
+        if base_filter is not None:
+            stmt_kw = stmt_kw.where(base_filter)
+        # Only return chunks that actually match the keyword query
+        stmt_kw = stmt_kw.where(Chunk.search_vector.op("@@")(kw_query))
+        stmt_kw = stmt_kw.order_by(desc(rank)).limit(top_k)
+        kw_results = self.db.execute(stmt_kw).all()
+        kw_chunks = [row[0] for row in kw_results]
+
+        logger.info(f"[Retrieval] Vector hits: {len(vec_results)}, Keyword hits: {len(kw_chunks)}")
+
+        # --- RRF Merge (k=60 is the standard constant) ---
+        RRF_K = 60
+        scores: Dict[str, float] = {}
+        chunk_map: Dict[str, Chunk] = {}
+
+        for rank_pos, chunk in enumerate(vec_results):
+            cid = str(chunk.id)
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (RRF_K + rank_pos + 1)
+            chunk_map[cid] = chunk
+
+        for rank_pos, chunk in enumerate(kw_chunks):
+            cid = str(chunk.id)
+            scores[cid] = scores.get(cid, 0.0) + 1.0 / (RRF_K + rank_pos + 1)
+            chunk_map[cid] = chunk
+
+        # Sort by RRF score descending, return top_k
+        sorted_ids = sorted(scores, key=lambda cid: scores[cid], reverse=True)[:top_k]
+        return [chunk_map[cid] for cid in sorted_ids]
     
     def query(
         self,
         question: str,
         document_ids: List[str] = None,
-        top_k: int = 5,
+        top_k: int = 10,
         conversation_history: List = None,
         system_prompt: str = None,
         web_search: bool = False,
