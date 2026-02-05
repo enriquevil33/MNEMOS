@@ -156,6 +156,15 @@ export class MainLayout implements OnInit {
     this.chatService.clearMessages();
     this.chatService.setConversationId(null);
     this.documentsService.clearSelection();
+
+    // Re-select documents for the active collection if one is set
+    const collectionId = this.selectedCollectionId();
+    if (collectionId) {
+      this.documentsService.documents()
+        .filter(doc => doc.collection_id === collectionId)
+        .forEach(doc => this.documentsService.toggleDocument(doc.id));
+    }
+
     this.router.navigate(['/']);
   }
 
