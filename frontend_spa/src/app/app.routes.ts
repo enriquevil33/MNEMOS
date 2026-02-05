@@ -26,6 +26,14 @@ export const routes: Routes = [
             {
                 path: AppRoutes.REASONING,
                 loadComponent: () => import('./pages/reasoning/reasoning.component').then(m => m.ReasoningComponent)
+            },
+            {
+                path: AppRoutes.WIKI,
+                loadComponent: () => import('./features/wiki/wiki-index.component').then(m => m.WikiIndexComponent)
+            },
+            {
+                path: AppRoutes.WIKI + '/:name',
+                loadComponent: () => import('./features/wiki/wiki-article.component').then(m => m.WikiArticleComponent)
             }
         ]
     }

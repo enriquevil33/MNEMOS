@@ -49,6 +49,9 @@ def create_app():
 
     from app.api.reasoning import bp as reasoning_bp
     app.register_blueprint(reasoning_bp)
+
+    from app.api.wiki import bp as wiki_bp
+    app.register_blueprint(wiki_bp)
     
     from sqlalchemy import text
     from sqlalchemy.exc import SQLAlchemyError

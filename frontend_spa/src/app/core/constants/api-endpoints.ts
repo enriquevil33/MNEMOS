@@ -51,4 +51,9 @@ export const ApiEndpoints = {
   // Reasoning
   REASONING_TRAVERSE: '/api/reasoning/traverse',
   REASONING_REPROCESS: '/api/reasoning/reprocess',
+
+  // Wiki
+  WIKI_CONCEPTS: '/api/wiki/concepts',
+  WIKI_ARTICLE: (name: string) => `/api/wiki/article/${encodeURIComponent(name)}`,
+  WIKI_SEARCH: '/api/wiki/search',
 } as const;
