@@ -108,7 +108,8 @@ export class WikiIndexComponent implements OnInit, AfterViewChecked {
 
   private fetchAll() {
     this.loading.set(true);
-    this.wikiService.listConcepts('', 500, 0).subscribe({
+    const letter = this.activeLetter();
+    this.wikiService.listConcepts(letter, 500, 0).subscribe({
       next: (res) => {
         this.allConcepts.set(res.concepts);
         this.total.set(res.total);
@@ -124,8 +125,8 @@ export class WikiIndexComponent implements OnInit, AfterViewChecked {
   private applyFilter() {
     let list = this.allConcepts();
     const q = this.query().trim().toLowerCase();
-    const letter = this.activeLetter();
 
+    // Only apply search query filter (letter filtering is done server-side)
     if (q) {
       list = list.filter(c =>
         c.name.toLowerCase().includes(q) ||
@@ -133,16 +134,9 @@ export class WikiIndexComponent implements OnInit, AfterViewChecked {
       );
     }
 
-    if (letter === '#') {
-      list = list.filter(c => !/^[a-z]/i.test(c.name));
-    } else if (letter) {
-      list = list.filter(c => c.name.toLowerCase().startsWith(letter.toLowerCase()));
-    }
-
     // Sort alphabetically
     list.sort((a, b) => a.name.localeCompare(b.name));
     this.displayedConcepts.set(list);
-    this.total.set(list.length);
   }
 
   onQueryInput(event: Event) {
@@ -154,7 +148,7 @@ export class WikiIndexComponent implements OnInit, AfterViewChecked {
   filterByLetter(letter: string) {
     this.activeLetter.set(this.activeLetter() === letter ? '' : letter);
     this.query.set('');
-    this.applyFilter();
+    this.fetchAll();  // Refetch from server with the new letter filter
   }
 
   openArticle(name: string) {

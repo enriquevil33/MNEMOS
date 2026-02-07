@@ -8,10 +8,10 @@ import { WikiArticle, WikiConceptList, WikiSearchResult } from '@core/models';
 export class WikiService {
   constructor(private http: HttpClient) {}
 
-  /** Alphabetical concept list with optional prefix filter and pagination. */
-  listConcepts(prefix = '', limit = 100, offset = 0): Observable<WikiConceptList> {
+  /** Alphabetical concept list with optional letter filter and pagination. */
+  listConcepts(letter = '', limit = 100, offset = 0): Observable<WikiConceptList> {
     const params: Record<string, string | number> = { limit, offset };
-    if (prefix) params['prefix'] = prefix;
+    if (letter) params['letter'] = letter;
     return this.http.get<WikiConceptList>(ApiEndpoints.WIKI_CONCEPTS, { params });
   }
 

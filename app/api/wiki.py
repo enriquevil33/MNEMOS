@@ -105,17 +105,24 @@ def _build_article(concept: Concept) -> dict:
 def list_concepts():
     """
     Alphabetical list of all concepts.
-    Supports ?prefix=<str> to filter by name prefix (case-insensitive).
+    Supports ?letter=<str> to filter by first letter (case-insensitive).
+        - Use 'a'-'z' for letter filtering
+        - Use '#' for concepts starting with non-letters
     Supports ?limit=<int>&offset=<int> for pagination.
     """
-    prefix = request.args.get('prefix', '').strip().lower()
+    letter = request.args.get('letter', '').strip().lower()
     limit = request.args.get('limit', 100, type=int)
     offset = request.args.get('offset', 0, type=int)
 
     query = db.session.query(Concept).order_by(func.lower(Concept.name))
 
-    if prefix:
-        query = query.filter(func.lower(Concept.name).startswith(prefix))
+    if letter:
+        if letter == '#':
+            # Filter for concepts that don't start with a-z
+            query = query.filter(~func.lower(Concept.name).op('REGEXP')('^[a-z]'))
+        elif len(letter) == 1 and letter.isalpha():
+            # Filter for concepts starting with the specified letter
+            query = query.filter(func.lower(Concept.name).startswith(letter))
 
     total = query.count()
     concepts = query.offset(offset).limit(limit).all()

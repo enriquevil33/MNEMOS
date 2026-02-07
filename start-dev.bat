@@ -7,10 +7,10 @@ docker-compose -f docker-compose.yml up --no-deps --build app worker ollama mcp 
 echo Waiting for backend to be ready...
 timeout /t 15 /nobreak >nul
 
-echo Starting Angular dev server...
+echo Starting Angular dev server in new window...
 cd frontend_spa
 start "" cmd /c "ng serve -o --port 5200"
 cd ..
 
-echo Dev server starting at http://localhost:5200
-pause
+echo Showing backend logs (Ctrl+C to stop)...
+docker-compose -f docker-compose.yml logs -f app worker ollama
