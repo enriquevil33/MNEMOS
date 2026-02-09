@@ -107,39 +107,42 @@ def upload_document():
 @bp.route('/<string:doc_id>', methods=['DELETE'])
 def delete_document(doc_id):
     """Elimina un documento y su archivo."""
+    from sqlalchemy import text
     logger.info(f"Deleting document {doc_id}")
+
+    # Get file path before deletion
     doc = db.session.query(Document).get(doc_id)
     if not doc:
         logger.warning(f"Document {doc_id} not found for deletion")
         return "", 404
-        
+
+    file_path = doc.file_path
+
     # Delete file from disk if it exists
-    if doc.file_path and not doc.file_path.startswith('youtube_'):
-         # Note: file_path should be just basename in our model currently
-         full_path = os.path.join(settings.UPLOAD_FOLDER, doc.file_path)
+    if file_path and not file_path.startswith('youtube_'):
+         full_path = os.path.join(settings.UPLOAD_FOLDER, file_path)
          if os.path.exists(full_path):
              try:
                  os.remove(full_path)
                  logger.info(f"Deleted file {full_path}")
              except Exception as e:
                  logger.error(f"Error deleting file {full_path}: {e}")
-    
-    db.session.delete(doc)
-    
+
+    # Use raw SQL to avoid SQLAlchemy relationship tracking issues
+    db.session.execute(text("DELETE FROM documents WHERE id = :id"), {"id": doc_id})
+    db.session.commit()
+    logger.info(f"Document {doc_id} deleted from DB")
+
     # Clean up orphan concepts
     try:
-        db.session.flush() # Ensure cascades happened
-        from sqlalchemy import text
-        cleanup_query = text("DELETE FROM concepts WHERE id NOT IN (SELECT concept_id FROM hyper_edge_members)")
-        result = db.session.execute(cleanup_query)
+        result = db.session.execute(text("DELETE FROM concepts WHERE id NOT IN (SELECT concept_id FROM hyper_edge_members)"))
+        db.session.commit()
         if result.rowcount > 0:
              logger.info(f"Cleanup: Removed {result.rowcount} orphan concepts.")
     except Exception as e:
         logger.warning(f"Orphan cleanup failed: {e}")
+        db.session.rollback()
 
-    db.session.commit()
-    logger.info(f"Document {doc_id} deleted from DB")
-    
     return "", 200
 
 @bp.route('/<string:doc_id>/status', methods=['GET'])

@@ -35,8 +35,8 @@ class HyperEdge(db.Model):
     
     # Relationships
     members = relationship('HyperEdgeMember', back_populates='hyper_edge', cascade='all, delete-orphan')
-    document = relationship('app.models.document.Document', backref='hyper_edges')
-    chunk = relationship('app.models.chunk.Chunk')
+    document = relationship('app.models.document.Document', backref='hyper_edges', passive_deletes=True)
+    chunk = relationship('app.models.chunk.Chunk', passive_deletes=True)
 
 class HyperEdgeMember(db.Model):
     __tablename__ = 'hyper_edge_members'

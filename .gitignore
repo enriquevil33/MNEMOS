@@ -22,6 +22,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+uploads/
 
 app/static/audio/
 
@@ -209,3 +210,4 @@ ARCHITECTURE_DIAGRAM.txt
 llm_repetition_problem_explained.txt
 pdf_workflow_diagram.txt
 huggingface_requests_explained.txt
+nul

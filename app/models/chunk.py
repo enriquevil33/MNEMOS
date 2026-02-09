@@ -10,7 +10,7 @@ class Chunk(db.Model):
     __tablename__ = 'chunks'
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
-    document_id = Column(UUID(as_uuid=True), ForeignKey('documents.id'), nullable=False)
+    document_id = Column(UUID(as_uuid=True), ForeignKey('documents.id', ondelete='CASCADE'), nullable=False)
     content = Column(Text, nullable=False)
     chunk_index = Column(Integer)  # Order of the chunk
     start_time = Column(Float)     # For audio/video (seconds)

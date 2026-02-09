@@ -1749,5 +1749,10 @@ def generate_pdf_report(markdown_content: str, filename: str = "report") -> str:
 # ============================================================================
 
 if __name__ == "__main__":
-    # Run the MCP server
+    import sys
+
+    # FastMCP's run() method doesn't support transport/port args directly
+    # It uses its own CLI parser internally
+    # The docker-compose command passes: run --transport sse --port 3000 --host 0.0.0.0
+    # FastMCP will handle these args automatically
     mcp.run()
