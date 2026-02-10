@@ -103,9 +103,46 @@ class HypergraphExtractor:
                 Text:
                 """ + context_text
 
+                # Define strict JSON schema for structured output
+                hypergraph_schema = {
+                    "name": "hypergraph_extraction",
+                    "strict": True,
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "events": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "source": {
+                                            "type": "array",
+                                            "items": {"type": "string"}
+                                        },
+                                        "relation": {"type": "string"},
+                                        "target": {
+                                            "type": "array",
+                                            "items": {"type": "string"}
+                                        }
+                                    },
+                                    "required": ["source", "relation", "target"],
+                                    "additionalProperties": False
+                                }
+                            },
+                            "definitions": {
+                                "type": "object",
+                                "additionalProperties": {"type": "string"}
+                            }
+                        },
+                        "required": ["events", "definitions"],
+                        "additionalProperties": False
+                    }
+                }
+
                 response = llm.chat(
                     system="You are an expert scientific knowledge graph builder. Output only valid JSON.",
-                    messages=[{"role": "user", "content": prompt}]
+                    messages=[{"role": "user", "content": prompt}],
+                    json_schema=hypergraph_schema
                 )
                 
                 try:
@@ -136,7 +173,49 @@ class HypergraphExtractor:
                     
                 except Exception as e:
                     logger.warning(f"Failed to parse LLM output for batch {i}: {e}. Response preview: {response[:100]}...")
-                    continue
+
+                    # Retry once with error feedback
+                    logger.info(f"Retrying batch {i} with error correction prompt...")
+                    retry_prompt = f"""
+                    The previous JSON output had an error: {str(e)}
+
+                    Please output VALID JSON only. Fix any syntax errors.
+                    REQUIRED structure:
+                    {{
+                      "events": [
+                        {{ "source": ["A"], "relation": "relates to", "target": ["B"] }}
+                      ],
+                      "definitions": {{
+                        "A": "definition"
+                      }}
+                    }}
+
+                    Previous attempt:
+                    {response[:500]}
+
+                    Output corrected JSON now:
+                    """
+
+                    try:
+                        retry_response = llm.chat(
+                            system="You are a JSON validator. Output only valid JSON.",
+                            messages=[{"role": "user", "content": retry_prompt}]
+                        )
+
+                        # Parse retry
+                        clean_retry = retry_response.strip()
+                        start_idx = clean_retry.find("{")
+                        end_idx = clean_retry.rfind("}")
+                        if start_idx != -1 and end_idx != -1:
+                            clean_retry = clean_retry[start_idx:end_idx+1]
+
+                        data = json.loads(clean_retry)
+                        events = data.get("events", [])
+                        definitions = data.get("definitions", {})
+                        logger.info(f"Retry successful for batch {i}")
+                    except Exception as retry_error:
+                        logger.error(f"Retry also failed for batch {i}: {retry_error}")
+                        continue
 
                 # 3. Process Definitions (Update Concepts)
                 for concept_name, definition_val in definitions.items():

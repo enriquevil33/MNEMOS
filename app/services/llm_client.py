@@ -169,12 +169,13 @@ class LLMClient:
              
         print(f"DEBUG: LLMClient Initialized. Provider: {self.provider}. Base URL: {self.client.base_url}")
             
-    def chat(self, system: str, messages: list, images: list = None, model: str = None) -> str:
+    def chat(self, system: str, messages: list, images: list = None, model: str = None, json_schema: dict = None) -> str:
         """
         Unified chat method.
         messages format: [{"role": "user", "content": "..."}]
         images: list of base64 strings (optional)
         model: optional model name to override the default/selected model
+        json_schema: optional JSON schema dict to force structured output (format: {"name": "...", "strict": True, "schema": {...}})
         """
         # Use explicit model if provided, otherwise check manager, otherwise default
         active_model = model or model_manager.get_model() or self.model
@@ -290,16 +291,26 @@ class LLMClient:
                     # Safe defaults if DB not available
                     max_tokens, temperature, top_p, freq_penalty, pres_penalty = 4096, 0.7, 0.9, 0.3, 0.1
 
-                response = self.client.chat.completions.create(
-                    model=active_model,
-                    messages=full_messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    top_p=top_p,
-                    frequency_penalty=freq_penalty,
-                    presence_penalty=pres_penalty,
-                    extra_body=extra_body
-                )
+                # Build request parameters
+                request_params = {
+                    "model": active_model,
+                    "messages": full_messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "top_p": top_p,
+                    "frequency_penalty": freq_penalty,
+                    "presence_penalty": pres_penalty,
+                    "extra_body": extra_body
+                }
+
+                # Add JSON schema if provided (for structured output)
+                if json_schema:
+                    request_params["response_format"] = {
+                        "type": "json_schema",
+                        "json_schema": json_schema
+                    }
+
+                response = self.client.chat.completions.create(**request_params)
                 response_json = response.model_dump_json()
                 try:
                     parsed = json.loads(response_json)
