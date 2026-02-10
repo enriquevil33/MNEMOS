@@ -7,6 +7,7 @@ class LLMProvider(str, Enum):
     ANTHROPIC = "anthropic"
     GROQ = "groq"
     LM_STUDIO = "lm_studio"
+    LLAMACPP = "llamacpp"
     OLLAMA = "ollama"
     CEREBRAS = "cerebras"
     CUSTOM = "custom"
@@ -22,7 +23,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://redis:6379/0"
     
     # LLM Configuration
-    LLM_PROVIDER: LLMProvider = LLMProvider.LM_STUDIO
+    LLM_PROVIDER: LLMProvider = LLMProvider.LLAMACPP
     
     # OpenAI
     OPENAI_API_KEY: str = ""
@@ -44,7 +45,11 @@ class Settings(BaseSettings):
     LOCAL_LLM_BASE_URL: str = "http://host.docker.internal:1234/v1"
     LOCAL_LLM_MODEL: str = "local-model"
     
-    # Ollama (Dockerized)
+    # llama.cpp (Dockerized) - Lightweight GGUF server
+    LLAMACPP_BASE_URL: str = "http://llamacpp:8080/v1"
+    LLAMACPP_NUM_CTX: int = 2048
+
+    # Ollama (Dockerized) - Optional, use --profile ollama to enable
     # Using internal docker hostname 'ollama' and port 11434
     OLLAMA_SERVICE_NAME: str = "ollama" # The docker-compose service name
     OLLAMA_BASE_URL: str = "http://ollama:11434/v1"

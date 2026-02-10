@@ -74,13 +74,23 @@ class LLMClient:
             )
             self.model = model or settings.GROQ_MODEL
             
+        elif self.provider == LLMProvider.LLAMACPP:
+            # llama.cpp server (OpenAI-compatible, lightweight GGUF server)
+            url = base_url or settings.LLAMACPP_BASE_URL
+            self.client = OpenAI(
+                base_url=url,
+                api_key="not-needed"
+            )
+            self.model = model or s_local_model
+            self.llamacpp_num_ctx = getattr(settings, 'LLAMACPP_NUM_CTX', 2048)
+
         elif self.provider == LLMProvider.OLLAMA:
             # For Ollama, we can use the passed base_url or the internal docker one
             # If base_url is passed (e.g. from Custom/LM Studio override), use it, otherwise default to internal
             url = base_url or settings.OLLAMA_BASE_URL
             self.client = OpenAI(
                 base_url=url,
-                api_key="ollama" 
+                api_key="ollama"
             )
             self.model = model or s_local_model
 
@@ -272,12 +282,15 @@ class LLMClient:
                 logger.info(f"Using model: {active_model}")
                 # logger.info(f"Sending payload to LLM: {json.dumps(full_messages, indent=2)}") # Too verbose with base64
 
-                # Prepare options directly supported by Ollama
+                # Prepare options directly supported by Ollama and llama.cpp
                 extra_body = {}
                 if self.provider == LLMProvider.OLLAMA:
                      extra_body["options"] = {
                          "num_ctx": getattr(self, 'ollama_num_ctx', 2048) or settings.OLLAMA_NUM_CTX
                      }
+                elif self.provider == LLMProvider.LLAMACPP:
+                     # llama.cpp uses different parameter names but is compatible
+                     extra_body["n_predict"] = max_tokens if 'max_tokens' in locals() else 4096
 
                 # Get generation parameters from DB
                 try:
