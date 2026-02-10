@@ -234,6 +234,311 @@ textarea {
     color: var(--color-primary);
 }
 
+/* Button Size Variants */
+.btn-xs {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    border-radius: 6px;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.875rem;
+    border-radius: 6px;
+}
+
+/* Button Shape Variants */
+.btn-circle {
+    border-radius: 50%;
+    padding: 8px;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Button Style Variants */
+.btn-ghost {
+    background-color: transparent;
+    color: var(--color-secondary);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-ghost:hover {
+    background-color: var(--color-hover);
+    color: var(--color-primary);
+}
+
+.btn-outline {
+    background-color: transparent;
+    color: var(--color-primary);
+    border: 1px solid var(--color-divider);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-outline:hover {
+    background-color: var(--color-hover);
+}
+
+.btn-outline.btn-error {
+    border-color: var(--color-error);
+    color: var(--color-error);
+}
+
+.btn-outline.btn-error:hover {
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* Base button class for consistent styling */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+    background-color: var(--color-input);
+    color: var(--color-primary);
+}
+
+.btn:hover {
+    background-color: var(--color-hover);
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn.btn-accent {
+    background-color: var(--color-accent);
+    color: white;
+}
+
+.btn.btn-accent:hover {
+    background-color: var(--color-accent-dark);
+}
+
+/* ============================================
+   FORM INPUT STYLES
+   ============================================ */
+
+.input,
+.select {
+    width: 100%;
+    padding: 8px 12px;
+    background-color: var(--color-input);
+    border: 1px solid var(--color-divider);
+    border-radius: 8px;
+    color: var(--color-primary);
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.input:focus,
+.select:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 2px rgba(57, 133, 255, 0.2);
+}
+
+.input::placeholder {
+    color: var(--color-secondary);
+}
+
+/* Input Size Variants */
+.input-xs {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+}
+
+.input-sm {
+    padding: 6px 10px;
+    font-size: 0.8125rem;
+}
+
+.select-sm {
+    padding: 6px 10px;
+    font-size: 0.8125rem;
+}
+
+/* Form Control & Label */
+.form-control {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+}
+
+.label-text {
+    font-size: 0.875rem;
+    color: var(--color-primary);
+}
+
+.label-text-alt {
+    font-size: 0.75rem;
+    color: var(--color-secondary);
+}
+
+/* Badge Style Variants for badges with neutral styling */
+.badge-neutral {
+    background-color: var(--color-input);
+    color: var(--color-primary);
+    border: 1px solid var(--color-divider);
+}
+
+/* Link styling */
+.link {
+    text-decoration: underline;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.link:hover {
+    color: var(--color-accent);
+}
+
+.link-accent {
+    color: var(--color-accent);
+}
+
+/* Radio button styling */
+.radio {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--color-divider);
+    border-radius: 50%;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.radio:checked {
+    border-color: var(--color-accent);
+}
+
+.radio:checked::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px;
+    height: 10px;
+    background-color: var(--color-accent);
+    border-radius: 50%;
+}
+
+.radio-sm {
+    width: 16px;
+    height: 16px;
+}
+
+.radio-sm:checked::after {
+    width: 8px;
+    height: 8px;
+}
+
+/* Range slider styling */
+.range {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background-color: var(--color-input);
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+.range::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: var(--color-accent);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.range::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+.range::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: var(--color-accent);
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.range::-moz-range-thumb:hover {
+    transform: scale(1.1);
+}
+
+.range-sm {
+    height: 4px;
+}
+
+.range-sm::-webkit-slider-thumb {
+    width: 14px;
+    height: 14px;
+}
+
+.range-sm::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+}
+
+/* Loading spinner */
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--color-divider);
+    border-top-color: var(--color-accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+.loading-lg {
+    width: 40px;
+    height: 40px;
+    border-width: 3px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 /* ============================================
    MODAL STYLES
    ============================================ */
@@ -433,6 +738,84 @@ textarea {
     color: var(--color-error);
 }
 
+/* Badge Size Variants */
+.badge-xs {
+    padding: 2px 6px;
+    font-size: 0.625rem;
+    border-radius: 8px;
+}
+
+.badge-sm {
+    padding: 3px 8px;
+    font-size: 0.6875rem;
+    border-radius: 10px;
+}
+
+/* Badge Style Variants */
+.badge-ghost {
+    background-color: transparent;
+    color: var(--color-secondary);
+    border: 1px solid var(--color-divider);
+}
+
+.badge-primary {
+    background-color: rgba(57, 133, 255, 0.1);
+    color: var(--color-accent);
+}
+
+.badge-accent {
+    background-color: rgba(57, 133, 255, 0.1);
+    color: var(--color-accent);
+}
+
+/* ============================================
+   TOGGLE SWITCH STYLES
+   ============================================ */
+
+.toggle {
+    appearance: none;
+    position: relative;
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
+    background-color: var(--color-input);
+    border: 2px solid var(--color-divider);
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.toggle:checked {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
+.toggle::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: white;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggle:checked::before {
+    transform: translateX(20px);
+}
+
+.toggle:hover:not(:disabled) {
+    border-color: var(--color-secondary);
+}
+
+.toggle:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* ============================================
    FOCUS STYLES
    ============================================ */
@@ -532,6 +915,23 @@ textarea:focus-visible {
     top: 0px;
     width: 3px;
     height: 7px;
+}
+
+.checkbox-sm {
+    width: 18px;
+    height: 18px;
+}
+
+.checkbox-sm:checked::after {
+    left: 5px;
+    top: 1px;
+    width: 4px;
+    height: 9px;
+}
+
+.checkbox-primary:checked {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
 }
 
 p {

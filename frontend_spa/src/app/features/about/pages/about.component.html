@@ -1,0 +1,55 @@
+<div class="h-full w-full overflow-y-auto">
+  <div class="container mx-auto px-4 py-8 max-w-4xl">
+    <h1 class="text-4xl font-bold text-primary mb-6">About MNEMOS</h1>
+
+    <div class="prose prose-invert max-w-none">
+      <p class="text-lg mb-4">
+        MNEMOS es un sistema de <strong>GraphRAG</strong> e indexación semántica con memoria persistente y capacidades agénticas multimodales.
+      </p>
+
+      <p class="mb-4">
+        Va más allá de la búsqueda de texto tradicional al integrar un <strong>Motor de Razonamiento</strong> y <strong>Extracción de Hipergrafos</strong> para comprender y conectar relaciones complejas entre conceptos. Permite procesar documentos PDF, archivos de audio, videos y contenido de YouTube, proporcionando una interfaz conversacional inteligente para consultar y <strong>analizar profundamente</strong> la información utilizando modelos de lenguaje grandes (LLMs).
+      </p>
+
+      <h2 class="text-2xl font-semibold mt-8 mb-4">Características Principales</h2>
+
+      <h3 class="text-xl font-semibold mt-6 mb-3">Experiencia de Usuario Mejorada</h3>
+      <ul class="list-disc pl-6 mb-4">
+        <li><strong>Citas Persistentes</strong>: Referencias interactivas a fuentes que se mantienen al recargar</li>
+        <li><strong>Gestión de Modelos</strong>: Descarga automática de modelos GGUF y gestión de modelos locales</li>
+        <li><strong>Lanzador Automático</strong>: Script launcher.py para configuración "one-click" en Windows</li>
+      </ul>
+
+      <h3 class="text-xl font-semibold mt-6 mb-3">Procesamiento Multimodal</h3>
+      <ul class="list-disc pl-6 mb-4">
+        <li><strong>Imágenes (Visión)</strong>: Análisis inteligente de imágenes con modelos Llama 3.2 Vision y similares</li>
+        <li><strong>PDFs</strong>: Extracción de texto y segmentación por páginas</li>
+        <li><strong>Audio/Video</strong>: Transcripción automática usando Whisper de OpenAI</li>
+        <li><strong>YouTube</strong>: Descarga y transcripción automática de videos</li>
+        <li><strong>Procesamiento Asíncrono</strong>: Sistema de colas con Celery para procesamiento en segundo plano</li>
+      </ul>
+
+      <h3 class="text-xl font-semibold mt-6 mb-3">Búsqueda Avanzada</h3>
+      <ul class="list-disc pl-6 mb-4">
+        <li><strong>Búsqueda Híbrida</strong>: Combina búsqueda vectorial (70%) y búsqueda de texto completo (30%)</li>
+        <li><strong>Embeddings Vectoriales</strong>: Utiliza pgvector con índices HNSW para búsquedas rápidas</li>
+        <li><strong>Chunking Inteligente</strong>: Segmentación semántica de documentos usando LangChain</li>
+        <li><strong>Extracción Profunda (Hypergraph)</strong>: Análisis granular de eventos, definiciones y relaciones semánticas</li>
+        <li><strong>Motor de Razonamiento</strong>: Capacidad de navegar el grafo de conocimiento para descubrir conexiones no obvias</li>
+      </ul>
+
+      <h3 class="text-xl font-semibold mt-6 mb-3">Interfaz y APIs</h3>
+      <ul class="list-disc pl-6 mb-4">
+        <li><strong>Interfaz Web Moderna</strong>: Single Page Application (SPA) construida con Angular 19</li>
+        <li><strong>Diseño Responsivo</strong>: Experiencia de usuario fluida en escritorio y móviles</li>
+        <li><strong>Micro-interacciones</strong>: Feedback visual inmediato y animaciones suaves</li>
+        <li><strong>API REST</strong>: Endpoints completos para integración</li>
+        <li><strong>MCP Server</strong>: Servidor Model Context Protocol para integración con Claude Desktop</li>
+      </ul>
+
+      <p class="mt-8 mb-8 text-secondary">
+        Para más información detallada sobre instalación, configuración y uso, consulta la documentación completa del proyecto.
+      </p>
+    </div>
+  </div>
+</div>

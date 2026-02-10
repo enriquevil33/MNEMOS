@@ -28,6 +28,10 @@ export const routes: Routes = [
                 loadComponent: () => import('./pages/reasoning/reasoning.component').then(m => m.ReasoningComponent)
             },
             {
+                path: AppRoutes.ABOUT,
+                loadComponent: () => import('./features/about/pages/about.component').then(m => m.AboutComponent)
+            },
+            {
                 path: AppRoutes.WIKI,
                 loadComponent: () => import('./features/wiki/wiki-index.component').then(m => m.WikiIndexComponent)
             },

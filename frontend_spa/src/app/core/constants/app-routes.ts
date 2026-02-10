@@ -5,5 +5,6 @@ export enum AppRoutes {
     LIBRARY = 'library',
     COLLECTIONS = 'collections',
     REASONING = 'reasoning',
-    WIKI = 'wiki'
+    WIKI = 'wiki',
+    ABOUT = 'about'
 }

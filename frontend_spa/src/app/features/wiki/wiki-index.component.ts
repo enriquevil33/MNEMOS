@@ -64,13 +64,13 @@ import { renderKatexInElement } from '../../shared/katex.util';
   </section>
 
   <!-- Pagination -->
-  @if (!loading() && total() > limit) {
+  <!-- @if (!loading() && total() > limit) {
     <footer class="wiki-pagination">
       <button class="btn-secondary" [disabled]="offset() === 0" (click)="page(-1)">← Previous</button>
       <span class="wiki-page-info">{{ offset() / limit + 1 }} / {{ totalPages() }}</span>
       <button class="btn-secondary" [disabled]="offset() + limit >= total()" (click)="page(1)">Next →</button>
     </footer>
-  }
+  } -->
 
 </div>
   `,

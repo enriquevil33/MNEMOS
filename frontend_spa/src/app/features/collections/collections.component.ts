@@ -18,34 +18,44 @@ import { CollectionModalComponent } from './collection-modal/collection-modal.co
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div *ngFor="let col of collections()" class="bg-panel rounded-lg shadow-sm border border-divider p-4 transition-shadow hover:shadow-md">
-           <div class="flex justify-between items-start mb-2">
+        @for (col of collections(); track col.id) {
+          <div class="bg-panel rounded-lg shadow-sm border border-divider p-4 transition-shadow hover:shadow-md">
+            <div class="flex justify-between items-start mb-2">
               <h2 class="text-xl font-semibold break-all">{{ col.name }}</h2>
-              <div class="dropdown dropdown-end">
-                    <label tabindex="0" class="btn btn-icon btn-sm cursor-pointer">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-5 h-5 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
-                    </label>
-                    <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow-lg bg-panel border border-divider rounded-lg w-52">
-                        <li><a class="py-2 hover:bg-hover rounded-md" (click)="openEditModal(col)">Edit</a></li>
-                        <li><a class="py-2 hover:bg-hover rounded-md text-error" (click)="deleteCollection(col.id)">Delete</a></li>
-                    </ul>
+              <div class="relative">
+                <button class="btn-icon" (click)="toggleDropdown(col.id)">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-5 h-5 stroke-current">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                  </svg>
+                </button>
+                @if (openDropdownId === col.id) {
+                  <div class="absolute right-0 mt-1 z-10 p-2 shadow-lg bg-panel border border-divider rounded-lg w-52">
+                    <button class="w-full text-left py-2 px-3 hover:bg-hover rounded-md transition-colors" (click)="openEditModal(col); closeDropdown()">
+                      Edit
+                    </button>
+                    <button class="w-full text-left py-2 px-3 hover:bg-hover rounded-md text-error transition-colors" (click)="deleteCollection(col.id); closeDropdown()">
+                      Delete
+                    </button>
+                  </div>
+                }
               </div>
-           </div>
-           <p class="text-secondary text-sm mb-4 min-h-[3rem]">{{ col.description || 'No description' }}</p>
-           <div class="flex justify-end border-t border-divider pt-3">
-             <span class="text-xs text-secondary">Created: {{ col.created_at | date:'mediumDate' }}</span>
-           </div>
-        </div>
+            </div>
+            <p class="text-secondary text-sm mb-4 min-h-[3rem]">{{ col.description || 'No description' }}</p>
+            <div class="flex justify-end border-t border-divider pt-3">
+              <span class="text-xs text-secondary">Created: {{ col.created_at | date:'mediumDate' }}</span>
+            </div>
+          </div>
+        }
       </div>
 
-       <app-collection-modal
-          [isOpen]="isModalOpen"
-          [collection]="currentCollection"
-          [isLoading]="isLoading"
-          [errorMessage]="errorMessage"
-          (save)="onSave($event)"
-          (cancel)="closeModal()">
-       </app-collection-modal>
+      <app-collection-modal
+        [isOpen]="isModalOpen"
+        [collection]="currentCollection"
+        [isLoading]="isLoading"
+        [errorMessage]="errorMessage"
+        (save)="onSave($event)"
+        (cancel)="closeModal()">
+      </app-collection-modal>
     </div>
   `
 })
@@ -58,6 +68,7 @@ export class CollectionsPageComponent implements OnInit {
     currentCollection: Collection | null = null;
     isLoading = false;
     errorMessage = '';
+    openDropdownId: string | null = null;
 
     ngOnInit() {
         this.loadCollections();
@@ -84,6 +95,14 @@ export class CollectionsPageComponent implements OnInit {
 
     closeModal() {
         this.isModalOpen = false;
+    }
+
+    toggleDropdown(id: string) {
+        this.openDropdownId = this.openDropdownId === id ? null : id;
+    }
+
+    closeDropdown() {
+        this.openDropdownId = null;
     }
 
     onSave(data: Partial<Collection>) {

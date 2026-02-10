@@ -45,7 +45,7 @@ import { ApiEndpoints } from '../../../core/constants/api-endpoints';
                <!-- Open Document Button -->
                <button (click)="openDocument()" class="px-4 py-2 rounded-lg hover:bg-primary-focus text-primary-content font-medium text-sm flex items-center gap-2 transition-colors shadow-lg">
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                  READ
+                  {{ getActionButtonText() }}
                </button>
 
                <!-- Close Button -->
@@ -610,6 +610,20 @@ export class LibraryDocumentModalComponent implements OnChanges {
 
   // --- Open Document Viewer ---
 
+  getActionButtonText(): string {
+    if (!this.document) return 'OPEN';
+
+    const fileType = this.document.file_type;
+
+    if (fileType === 'video' || fileType === 'youtube') {
+      return 'WATCH';
+    } else if (fileType === 'audio') {
+      return 'LISTEN';
+    } else {
+      return 'READ';
+    }
+  }
+
   openDocument() {
     if (!this.document) return;
 
@@ -618,10 +632,11 @@ export class LibraryDocumentModalComponent implements OnChanges {
     if (fileType === 'pdf' || this.document.original_filename?.toLowerCase().endsWith('.pdf')) {
       this.modalService.openPdfViewer(this.document);
     } else if (fileType === 'youtube') {
-      const meta = this.document.metadata as any;
-      const url = meta?.youtube_url || meta?.url;
+      const url = this.document.youtube_url;
       if (url) {
         this.modalService.openYoutubeViewer(url);
+      } else {
+        alert('YouTube URL not found for this video');
       }
     } else if (fileType === 'video' || fileType === 'audio') {
       const url = ApiEndpoints.DOCUMENT_CONTENT(this.document.id);

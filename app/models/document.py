@@ -56,6 +56,7 @@ class Document(db.Model):
             "filename": self.filename,
             "original_filename": self.original_filename,
             "file_type": self.file_type,
+            "youtube_url": self.youtube_url,
             "status": self.status,
             "processing_progress": self.processing_progress or 0,
             "created_at": self.created_at.isoformat() if self.created_at else None,

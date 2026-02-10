@@ -418,7 +418,7 @@
                             class="bg-panel border border-divider rounded-xl p-4 sm:p-6 hover:border-accent transition-colors">
                             <div class="flex items-start justify-between mb-3">
                                 <div>
-                                    <h3 class="font-mono font-semibold text-base mb-1 text-base-content">{{
+                                    <h3 class="font-mono font-semibold mb-1 text-base-content">{{
                                         model.name
                                         }}</h3>
                                     <p class="text-xs text-base-content/80">{{ model.author }} • {{ model.params }}
@@ -1003,7 +1003,7 @@
 <!-- Modal: New/Edit Prompt -->
 @if (isPromptModalOpen()) {
 <div class="modal modal-open">
-    <div class="modal-box bg-panel border border-divider rounded-2xl p-0 max-w-2xl">
+    <div class="modal-box bg-panel border border-divider rounded-2xl p-0 max-w-4xl">
         <div class="p-4 sm:p-6 border-b border-divider">
             <h3 class="text-lg font-semibold">{{ editingPromptId() ? 'Edit' : 'New' }} System Prompt</h3>
         </div>
@@ -1035,7 +1035,7 @@
 <!-- Modal: GGUF File Selection (Hardware Aware) -->
 @if (isGgufModalOpen()) {
 <div class="modal modal-open">
-    <div class="modal-box bg-panel border border-divider rounded-2xl p-0 max-w-4xl">
+    <div class="modal-box bg-panel border border-divider rounded-2xl p-0 max-w-7xl">
         <div class="p-4 sm:p-6 border-b border-divider flex justify-between items-center">
             <div>
                 <h3 class="text-lg font-semibold">Select GGUF File</h3>

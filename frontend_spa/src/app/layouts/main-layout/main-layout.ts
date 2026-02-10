@@ -191,6 +191,21 @@ export class MainLayout implements OnInit {
     this.modalService.openPdfViewer(doc);
   }
 
+  openVideo(doc: Document, event: Event) {
+    event.stopPropagation();
+    const url = `/api/documents/${doc.id}/content`;
+    this.modalService.openVideoPlayer(url);
+  }
+
+  openYouTube(doc: Document, event: Event) {
+    event.stopPropagation();
+    if (doc.youtube_url) {
+      this.modalService.openYoutubeViewer(doc.youtube_url);
+    } else {
+      this.toastr.error('YouTube URL not found for this video');
+    }
+  }
+
   // Upload Modal Methods
   switchUploadTab(tab: 'file' | 'youtube') {
     this.uploadTab.set(tab);

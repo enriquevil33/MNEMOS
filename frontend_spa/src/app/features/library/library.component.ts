@@ -64,7 +64,7 @@ import { LibraryDocumentModalComponent } from './library-document-modal/library-
                 {{ doc.tag || doc.original_filename }}
              </h2>
 
-             <div class="flex items-center justify-between text-xs text-secondary mt-auto pt-2 px-4 border-t border-divider">
+             <div class="flex items-center justify-between text-xs text-secondary mt-auto py-2 px-4 border-t border-divider">
                 <span>{{ doc.created_at | date:'mediumDate' }}</span>
                 <span *ngIf="doc.collection_id" class="px-2 py-0.5 bg-hover rounded-full max-w-[50%] truncate">
                     {{ getCollectionName(doc.collection_id) }}
