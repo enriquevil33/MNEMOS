@@ -67,28 +67,39 @@ class HypergraphExtractor:
                 
                 prompt = """
                 You are a network ontology graph maker. Analyze the text to extract scientific knowledge.
-                
+
                 Tasks:
                 1. Identify specific assertions (Source -> Relation -> Target).
                 2. Extract definitions for technical concepts.
-                
-                Output valid JSON only. Structure:
+
+                CRITICAL: Output ONLY valid JSON. Use proper JSON syntax:
+                - All keys MUST be strings in double quotes
+                - "source" and "target" are REQUIRED keys (not "1", "2", etc.)
+                - Arrays must use square brackets []
+
+                EXACT Structure (copy this):
                 {
                   "events": [
-                    { "source": ["A"], "relation": "relates to", "target": ["B"] }
+                    { "source": ["concept A"], "relation": "relates to", "target": ["concept B"] }
                   ],
                   "definitions": {
-                    "A": "definition..."
+                    "concept A": "definition text here"
                   }
                 }
-                DO NOT output multiple JSON objects. MERGE them into one.
-                
+
+                WRONG (will fail):
+                { "source": ["A"], "relation": "relates to", 1: "B" }
+
+                CORRECT:
+                { "source": ["A"], "relation": "relates to", "target": ["B"] }
+
                 Rules:
                 - Use precise technical terms.
                 - IMPORTANT: Keep concept names and relations in the SAME LANGUAGE as the source text. Do NOT translate them to English.
                 - Normalize names (e.g., "this protein" -> "Protein X").
                 - Capture up to 10 most important events per batch.
-                
+                - DO NOT output multiple JSON objects. MERGE them into one.
+
                 Text:
                 """ + context_text
 
@@ -99,20 +110,25 @@ class HypergraphExtractor:
                 
                 try:
                     # JSON Parsing
-                    clean_json = response.strip()         
-                    
+                    clean_json = response.strip()
+
                     # Robust extraction: Remove C-style comments // ...
                     import re
                     clean_json = re.sub(r"//.*", "", clean_json)
-                    
+
                     # Robust extraction: Find first and last brace
                     start_idx = clean_json.find("{")
                     end_idx = clean_json.rfind("}")
-                    
+
                     if start_idx != -1 and end_idx != -1:
                         clean_json = clean_json[start_idx:end_idx+1]
                     else:
                         raise json.JSONDecodeError("No JSON braces found", clean_json, 0)
+
+                    # FIX: Replace numeric keys (1:, 2:) with "target":
+                    # Common LLM error: { "source": ["A"], "relation": "...", 1: "B" }
+                    clean_json = re.sub(r',\s*(\d+):', r', "target":', clean_json)
+                    clean_json = re.sub(r'\{\s*"source"([^}]+)\s+(\d+):', r'{ "source"\1 "target":', clean_json)
 
                     data = json.loads(clean_json)
                     events = data.get("events", [])
