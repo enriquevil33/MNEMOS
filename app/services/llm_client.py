@@ -5,6 +5,7 @@ from app.services.model_manager import model_manager
 from app.extensions import db
 from app.models.user_preferences import UserPreferences
 from app.models.llm_connection import LLMConnection
+from httpx import Timeout
 
 import os
 
@@ -56,9 +57,12 @@ class LLMClient:
         self.ollama_num_ctx = db_prefs.ollama_num_ctx if db_prefs else settings.OLLAMA_NUM_CTX
         
         # Initialize Client based on Provider
+        # Set generous timeout for vision models and long-running requests (10 minutes)
+        client_timeout = Timeout(600.0, connect=60.0)
+
         if self.provider == LLMProvider.OPENAI:
             key = api_key or d_openai_key or s_openai_key
-            self.client = OpenAI(api_key=key)
+            self.client = OpenAI(api_key=key, timeout=client_timeout)
             self.model = model or settings.OPENAI_MODEL # Fallback defaults
             
         elif self.provider == LLMProvider.ANTHROPIC:
@@ -70,7 +74,8 @@ class LLMClient:
             key = api_key or d_groq_key or s_groq_key
             self.client = OpenAI(
                 base_url="https://api.groq.com/openai/v1",
-                api_key=key or "gsk_..." 
+                api_key=key or "gsk_...",
+                timeout=client_timeout
             )
             self.model = model or settings.GROQ_MODEL
             
@@ -79,7 +84,8 @@ class LLMClient:
             url = base_url or settings.LLAMACPP_BASE_URL
             self.client = OpenAI(
                 base_url=url,
-                api_key="not-needed"
+                api_key="not-needed",
+                timeout=client_timeout
             )
             self.model = model or s_local_model
             self.llamacpp_num_ctx = getattr(settings, 'LLAMACPP_NUM_CTX', 2048)
@@ -90,7 +96,8 @@ class LLMClient:
             url = base_url or settings.OLLAMA_BASE_URL
             self.client = OpenAI(
                 base_url=url,
-                api_key="ollama"
+                api_key="ollama",
+                timeout=client_timeout
             )
             self.model = model or s_local_model
 
@@ -98,20 +105,21 @@ class LLMClient:
             key = api_key or d_cerebras_key or s_cerebras_key
             self.client = OpenAI(
                 base_url="https://api.cerebras.ai/v1",
-                api_key=key
+                api_key=key,
+                timeout=client_timeout
             )
             self.model = model or settings.CEREBRAS_MODEL
 
         elif self.provider == LLMProvider.LM_STUDIO:
             url = base_url or d_local_base_url or s_local_base_url
-            
+
             # Docker Fix: Replace localhost with host.docker.internal if running in Docker
             # This handles cases where user sets 'http://localhost:1234' in settings but is running in a container
             if url and ("localhost" in url or "127.0.0.1" in url):
-                if os.path.exists('/.dockerenv'): 
+                if os.path.exists('/.dockerenv'):
                      url = url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal")
                      print(f"DEBUG: Auto-corrected LM Studio URL to: {url}")
-            
+
             # Ensure URL ends with /v1 for LM Studio
             if url and not url.endswith("/v1"):
                 url = f"{url.rstrip('/')}/v1"
@@ -119,7 +127,8 @@ class LLMClient:
 
             self.client = OpenAI(
                 base_url=url,
-                api_key="lm-studio"
+                api_key="lm-studio",
+                timeout=client_timeout
             )
             self.model = model or s_local_model
         
@@ -173,7 +182,8 @@ class LLMClient:
 
              self.client = OpenAI(
                 base_url=url,
-                api_key=key or "not-needed"
+                api_key=key or "not-needed",
+                timeout=client_timeout
             )
              self.model = model or s_local_model
              
