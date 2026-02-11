@@ -22,7 +22,6 @@ services:
       - REDIS_URL=redis://redis:6379/0
       # Ensure python doesn't buffer output so we see logs in realtime
       - PYTHONUNBUFFERED=1
-      - OLLAMA_NUM_CTX=2048
       - EMBEDDING_PROVIDER=local
       - EMBEDDING_DEVICE=cuda
       - EMBEDDING_MODEL=BAAI/bge-m3
@@ -33,7 +32,7 @@ services:
       - ./config:/app/config:rw
       - ./.env:/app/.env:ro
       - ./migrations:/app/migrations:rw
-      - ./ollama_models/import:/app/ollama_import:rw
+      - ./models:/app/models:ro
       - uploads_data:/app/uploads
       - whisper_cache:/root/.cache/whisper
       - hf_cache:/root/.cache/huggingface
@@ -60,7 +59,6 @@ services:
       - DATABASE_URL=postgresql://mnemos_user:mnemos_pass@db:5432/mnemos_db
       - REDIS_URL=redis://redis:6379/0
       - PYTHONUNBUFFERED=1
-      - OLLAMA_NUM_CTX=2048
       - EMBEDDING_PROVIDER=local
       - EMBEDDING_DEVICE=cuda
       - EMBEDDING_MODEL=BAAI/bge-m3
@@ -73,7 +71,7 @@ services:
       - uploads_data:/app/uploads
       - whisper_cache:/root/.cache/whisper
       - hf_cache:/root/.cache/huggingface
-      - ./ollama_models/import:/app/ollama_import:rw
+      - ./models:/app/models:rw
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       db:
@@ -95,16 +93,19 @@ services:
     # Run 'docker compose pull llamacpp' to get updates
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
     pull_policy: always
+    profiles: ["llamacpp"]  # Only starts when model exists
     ports:
-      - "8080:8080"
+      - "8082:8080"
+    environment:
+      - LLAMACPP_NUM_CTX=${LLAMACPP_NUM_CTX:-16384}
     volumes:
       - ./models:/models
     command: >
       --port 8080
       --host 0.0.0.0
-      -m /models/model.gguf
+      -m ${LLAMACPP_MODEL_PATH:-/models/Hermes-3-Llama-3.2-3B.Q4_K_M.gguf}
       -ngl 999
-      -c 2048
+      -c 16384
     deploy:
       resources:
         reservations:
@@ -113,31 +114,6 @@ services:
               count: 1
               capabilities: [ gpu ]
     restart: unless-stopped
-
-  ollama:
-    image: ollama/ollama:latest
-    # container_name: mnemos-ollama
-    profiles: [ "ollama" ]  # Moved to profile - start with: docker compose --profile ollama up
-    ports:
-      - "11435:11434"
-    volumes:
-      - ollama_models:/root/.ollama
-      - ./ollama_models/import:/root/.ollama/import
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [ gpu ]
-    environment:
-      - OLLAMA_HOST="0.0.0.0"
-      - OLLAMA_FLASH_ATTENTION=1
-      - OLLAMA_GPU_LAYERS=-1
-      - CUDA_VISIBLE_DEVICES=0
-      - OLLAMA_MAX_LOADED_MODELS=1
-      - OLLAMA_NUM_CTX=2048
-    restart: no
 
   mcp:
     build: .
@@ -202,5 +178,3 @@ volumes:
   whisper_cache:
   redis_data:
   hf_cache:
-  ollama_models:
-    external: true

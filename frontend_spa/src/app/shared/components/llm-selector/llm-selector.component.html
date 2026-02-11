@@ -7,6 +7,7 @@
     <select [ngModel]="selectedProvider()" (ngModelChange)="updateProvider($event)"
       class="select select-bordered w-full bg-input border-divider text-primary focus:border-accent focus:ring-1 focus:ring-accent transition-all">
       <option value="ollama">Ollama (Local)</option>
+      <option value="llamacpp">llama.cpp (Local)</option>
       <option value="openai">OpenAI</option>
       <option value="anthropic">Anthropic</option>
       <option value="groq">Groq</option>

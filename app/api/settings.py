@@ -101,6 +101,54 @@ def delete_model():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@bp.route('/llamacpp/models', methods=['GET'])
+def get_llamacpp_models():
+    """List available GGUF models in the models/ directory for llamacpp."""
+    try:
+        import os
+        import glob
+
+        # Path to models directory (same as mounted in llamacpp container)
+        models_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'models')
+
+        if not os.path.exists(models_dir):
+            return jsonify({
+                'models': [],
+                'message': 'Models directory not found'
+            })
+
+        # Find all .gguf files
+        gguf_files = glob.glob(os.path.join(models_dir, '*.gguf'))
+
+        models = []
+        for file_path in gguf_files:
+            filename = os.path.basename(file_path)
+            file_size = os.path.getsize(file_path)
+            size_mb = round(file_size / (1024 * 1024), 2)
+
+            models.append({
+                'name': filename,
+                'filename': filename,
+                'size': file_size,
+                'size_mb': size_mb,
+                'path': f'/models/{filename}'
+            })
+
+        # Sort by size (smallest first for faster loading)
+        models.sort(key=lambda x: x['size'])
+
+        return jsonify({
+            'models': models,
+            'count': len(models)
+        })
+
+    except Exception as e:
+        logging.error(f"Error listing llamacpp models: {e}")
+        return jsonify({
+            'error': str(e),
+            'models': []
+        }), 500
+
 @bp.route('/library/search', methods=['GET'])
 def search_library():
     """Search Hugging Face for GGUF models compatible with Ollama."""
@@ -674,14 +722,14 @@ def get_hardware_info():
 
 @bp.route('/import/scan', methods=['GET'])
 def scan_imports():
-    """Scan import directory for GGUF files."""
+    """Scan models directory for GGUF files."""
     try:
-        # Path inside APP container
-        import_dir = "/app/ollama_import" 
-        if not os.path.exists(import_dir):
+        # Path inside APP container - using new models/ folder
+        models_dir = "/app/models"
+        if not os.path.exists(models_dir):
             return jsonify({"files": []})
-            
-        files = [f for f in os.listdir(import_dir) if f.endswith('.gguf')]
+
+        files = [f for f in os.listdir(models_dir) if f.endswith('.gguf')]
         return jsonify({"files": files})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -690,9 +738,9 @@ def scan_imports():
 def upload_gguf():
     """Upload a GGUF model file."""
     try:
-        import_dir = "/app/ollama_import"
-        if not os.path.exists(import_dir):
-            os.makedirs(import_dir)
+        models_dir = "/app/models"
+        if not os.path.exists(models_dir):
+            os.makedirs(models_dir)
             
         if 'file' not in request.files:
             return jsonify({"error": "No file part"}), 400
@@ -705,7 +753,7 @@ def upload_gguf():
             return jsonify({"error": "Only .gguf files are allowed"}), 400
 
         filename = os.path.basename(file.filename) # sanitize?
-        save_path = os.path.join(import_dir, filename)
+        save_path = os.path.join(models_dir, filename)
         
         # Save file (chunked to avoid memory issues)
         file.save(save_path) # Flask's save uses shutil.copyfileobj which is efficient

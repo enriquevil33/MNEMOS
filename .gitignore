@@ -23,6 +23,8 @@ share/python-wheels/
 *.egg
 MANIFEST
 uploads/
+models/*
+_nul
 
 app/static/audio/
 

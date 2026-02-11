@@ -28,7 +28,11 @@ export class SettingsPage implements OnInit {
     chatSelector = viewChild<LlmSelectorComponent>('chatSelector');
     memorySelector = viewChild<LlmSelectorComponent>('memorySelector');
 
-    activeTab = signal<'models' | 'discover' | 'import' | 'chat' | 'voice' | 'plugins'>('models');
+    activeTab = signal<'models' | 'discover' | 'manage' | 'chat' | 'voice' | 'plugins'>('models');
+
+    // GGUF Models (for llama.cpp)
+    ggufModels = signal<any[]>([]);
+    currentGgufModel = signal<string>('');
 
     // Proxy for Memory Selector
     // Maps memory_* fields to llm_* fields so LlmSelectorComponent works as is
@@ -197,21 +201,30 @@ export class SettingsPage implements OnInit {
     }
 
     async loadAllData() {
-        // Load models separately as it might fail if Ollama is down
-        try {
-            await this.settingsService.loadModels();
-        } catch (e) {
-            console.warn('Failed to load models (expected if Ollama is down)');
-        }
+        // Load GGUF models for llama.cpp
+        await this.loadGgufModels();
 
         await Promise.all([
-            this.settingsService.loadCurrentModel().catch(() => { }),
             this.settingsService.loadChatPreferences(),
             this.settingsService.loadSystemPrompts(),
             this.settingsService.loadMemories(),
-            this.settingsService.loadConnections(),
-            this.checkOllamaStatus()
+            this.settingsService.loadConnections()
         ]);
+    }
+
+    async loadGgufModels() {
+        try {
+            const response = await this.settingsService.getLlamacppModels();
+            this.ggufModels.set(response.models);
+
+            // Load current model from preferences
+            const prefs = this.settingsService.chatPreferences();
+            if (prefs?.llm_provider === 'llamacpp' && prefs?.selected_llm_model) {
+                this.currentGgufModel.set(prefs.selected_llm_model);
+            }
+        } catch (e) {
+            console.error('Failed to load GGUF models:', e);
+        }
     }
 
     async startDownloadPolling() {
@@ -327,9 +340,9 @@ export class SettingsPage implements OnInit {
         }
     }
 
-    switchTab(tab: 'models' | 'discover' | 'import' | 'chat' | 'voice' | 'plugins') {
+    switchTab(tab: 'models' | 'discover' | 'manage' | 'chat' | 'voice' | 'plugins') {
         this.activeTab.set(tab);
-        if (tab === 'import') {
+        if (tab === 'manage') {
             this.scanImports();
         } else if (tab === 'discover') {
             // Only search if empty to encourage discovery but avoid re-fetch on every tab switch if not needed?
@@ -348,6 +361,21 @@ export class SettingsPage implements OnInit {
 
     async handleSetCurrentModel(modelName: string) {
         await this.settingsService.setCurrentModel(modelName);
+    }
+
+    async handleSetCurrentGgufModel(filename: string) {
+        try {
+            // Update preferences to use llamacpp with this model
+            await this.settingsService.saveChatPreferences({
+                llm_provider: 'llamacpp',
+                selected_llm_model: filename
+            });
+            this.currentGgufModel.set(filename);
+            this.toastr.success(`Model set to ${filename}`);
+        } catch (e) {
+            console.error('Failed to set GGUF model:', e);
+            this.toastr.error('Failed to set model');
+        }
     }
 
     // Discover

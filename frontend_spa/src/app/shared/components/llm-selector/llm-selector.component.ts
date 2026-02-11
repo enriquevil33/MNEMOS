@@ -53,6 +53,7 @@ export class LlmSelectorComponent {
   );
 
   fetchedGroqModels = signal<any[]>([]);
+  fetchedLlamacppModels = signal<any[]>([]);
 
   // Hardcoded Model Lists (unchanged)
   readonly openaiModels = [
@@ -85,6 +86,9 @@ export class LlmSelectorComponent {
 
   constructor() {
     this.settingsService.loadConnections();
+
+    // Load llamacpp models on init
+    this.loadLlamacppModels();
 
     // Sync when preferences input changes
     effect(() => {
@@ -147,8 +151,9 @@ export class LlmSelectorComponent {
       case 'lm_studio':
       case 'custom':
       case 'ollama':
+      case 'llamacpp':
         this.baseUrl.set(prefs.local_llm_base_url || '');
-        if (provider !== 'ollama') this.customModelId.set(prefs.selected_llm_model || '');
+        if (provider !== 'ollama' && provider !== 'llamacpp') this.customModelId.set(prefs.selected_llm_model || '');
         break;
     }
   }
@@ -171,6 +176,9 @@ export class LlmSelectorComponent {
         break;
       case 'groq':
         models = this.fetchedGroqModels().length > 0 ? this.fetchedGroqModels() : this.groqModels;
+        break;
+      case 'llamacpp':
+        models = this.fetchedLlamacppModels();
         break;
       case 'custom':
         // Custom models from active connection
@@ -220,6 +228,19 @@ export class LlmSelectorComponent {
       const models = await this.settingsService.lookupModels('groq', key);
       this.fetchedGroqModels.set(models);
     } catch (e) { console.error(e); }
+  }
+
+  async loadLlamacppModels() {
+    try {
+      const response = await this.settingsService.getLlamacppModels();
+      const models = response.models.map((m: any) => ({
+        name: m.filename,
+        vision: false
+      }));
+      this.fetchedLlamacppModels.set(models);
+    } catch (e) {
+      console.error('Failed to load llamacpp models:', e);
+    }
   }
 
   // Custom Connection Logic
@@ -339,7 +360,7 @@ export class LlmSelectorComponent {
     if (provider === 'anthropic') update.anthropic_api_key = this.apiKey();
     if (provider === 'groq') update.groq_api_key = this.apiKey();
 
-    if (['ollama', 'lm_studio'].includes(provider)) {
+    if (['ollama', 'lm_studio', 'llamacpp'].includes(provider)) {
       update.local_llm_base_url = this.baseUrl();
     }
 
@@ -353,6 +374,8 @@ export class LlmSelectorComponent {
       update.selected_llm_model = this.customModelId();
     } else if (provider === 'ollama') {
       update.ollamaModel = this.selectedModel(); // Special handling for Ollama
+    } else if (provider === 'llamacpp') {
+      update.selected_llm_model = this.selectedModel(); // For llamacpp, store the selected .gguf filename
     } else if (provider === 'custom') {
       // For Custom, the "selected model" is the connection's default model
       update.selected_llm_model = this.connForm.defaultModel();

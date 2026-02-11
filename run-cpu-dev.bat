@@ -1,8 +1,7 @@
 @echo off
 echo Starting MNEMOS in CPU Dev Mode (Hot Reload)...
 echo Starting backend containers...
-docker volume create ollama_models >nul 2>&1
-docker-compose -f docker-compose.yml -f docker-compose.cpu.yml up --no-deps --build app worker ollama mcp db redis adminer -d
+docker-compose -f docker-compose.yml -f docker-compose.cpu.yml up --no-deps --build app worker llamacpp mcp db redis adminer -d
 
 echo Waiting for backend to be ready...
 timeout /t 15 /nobreak >nul
@@ -13,4 +12,4 @@ start "" cmd /c "ng serve -o --port 5200"
 cd ..
 
 echo Showing backend logs (Ctrl+C to stop)...
-docker-compose -f docker-compose.yml -f docker-compose.cpu.yml logs -f app worker ollama
+docker-compose -f docker-compose.yml -f docker-compose.cpu.yml logs -f app worker llamacpp

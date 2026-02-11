@@ -12,7 +12,7 @@ class HFDownloader:
     """
     
     BASE_API_URL = "https://huggingface.co/api/models"
-    IMPORT_DIR = "/app/ollama_import"
+    IMPORT_DIR = "/app/models"
 
     @staticmethod
     def list_gguf_files(repo_id):

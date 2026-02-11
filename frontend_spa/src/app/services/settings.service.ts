@@ -446,4 +446,15 @@ export class SettingsService {
       throw error;
     }
   }
+
+  async getLlamacppModels(): Promise<{ models: any[], count: number }> {
+    try {
+      return await firstValueFrom(
+        this.http.get<{ models: any[], count: number }>('/api/settings/llamacpp/models')
+      );
+    } catch (error) {
+      console.error('Failed to load llamacpp models', error);
+      return { models: [], count: 0 };
+    }
+  }
 }

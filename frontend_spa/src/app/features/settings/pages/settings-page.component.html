@@ -39,12 +39,12 @@
                         [style.border-color]="activeTab() !== 'discover' ? 'transparent' : ''">
                         Discover Models
                     </button>
-                    <button (click)="switchTab('import')" [class.border-accent]="activeTab() === 'import'"
-                        [class.text-primary]="activeTab() === 'import'"
-                        [class.text-secondary]="activeTab() !== 'import'"
+                    <button (click)="switchTab('manage')" [class.border-accent]="activeTab() === 'manage'"
+                        [class.text-primary]="activeTab() === 'manage'"
+                        [class.text-secondary]="activeTab() !== 'manage'"
                         class="px-1 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap hover:text-primary"
-                        [style.border-color]="activeTab() !== 'import' ? 'transparent' : ''">
-                        Import GGUF
+                        [style.border-color]="activeTab() !== 'manage' ? 'transparent' : ''">
+                        Manage Models
                     </button>
                     <button (click)="switchTab('chat')" [class.border-accent]="activeTab() === 'chat'"
                         [class.text-primary]="activeTab() === 'chat'" [class.text-secondary]="activeTab() !== 'chat'"
@@ -276,9 +276,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div class="bg-input rounded-lg p-4 col-span-3">
                                 <div class="text-xs text-secondary mb-1">Models Installed</div>
-                                <div class="text-2xl font-bold text-accent">{{
-                                    settingsService.models()?.models?.length
-                                    || 0 }}</div>
+                                <div class="text-2xl font-bold text-accent">{{ ggufModels().length }}</div>
                             </div>
                         </div>
                     </div>
@@ -291,8 +289,7 @@
                                     d="M5 13l4 4L19 7" />
                             </svg>
                             <span class="text-sm font-medium">Active Model: <strong>{{
-                                    settingsService.currentModel() ||
-                                    'None' }}</strong></span>
+                                    currentGgufModel() || 'None' }}</strong></span>
                         </div>
                     </div>
 
@@ -302,28 +299,23 @@
                             <h2 class="text-lg font-semibold">Your Models</h2>
                         </div>
                         <div class="divide-y divide-divider">
-                            @for (model of settingsService.models()?.models; track model.name) {
+                            @for (model of ggufModels(); track model.filename) {
                             <div class="p-4 sm:p-6 hover:bg-hover transition-colors">
                                 <div class="flex items-start justify-between gap-4">
                                     <div class="flex-1 min-w-0">
                                         <div class="flex items-center gap-2 mb-2">
                                             <input type="radio" name="model-select"
-                                                [checked]="settingsService.currentModel() === model.name"
-                                                (change)="handleSetCurrentModel(model.name)"
+                                                [checked]="currentGgufModel() === model.filename"
+                                                (change)="handleSetCurrentGgufModel(model.filename)"
                                                 class="radio radio-sm radio-accent">
-                                            <h3>
-                                                {{ model.name }}
+                                            <h3 class="font-medium">
+                                                {{ model.filename }}
                                             </h3>
-                                            @if (model.description) {
-                                            <p class="text-xs text-secondary mt-0.5 mb-1 line-clamp-2">
-                                                {{ model.description }}
-                                            </p>
-                                            }
-                                            @if (settingsService.currentModel() === model.name) {
-                                            <span class="badge badge-success">Active</span>
+                                            @if (currentGgufModel() === model.filename) {
+                                            <span class="badge badge-success badge-sm">Active</span>
                                             }
                                         </div>
-                                        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-secondary mb-1">
+                                        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-secondary">
                                             <span class="flex items-center gap-1" title="Model Size">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor"
                                                     viewBox="0 0 24 24">
@@ -331,41 +323,17 @@
                                                         stroke-width="2"
                                                         d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                                 </svg>
-                                                {{ (model.size / 1024 / 1024 / 1024) | number:'1.1-2' }} GB
+                                                {{ model.size_mb }} MB
                                             </span>
-                                            @if (model.details?.parameter_size) {
-                                            <span class="badge badge-sm badge-ghost gap-1">
-                                                {{ model.details?.parameter_size }}
-                                            </span>
-                                            }
-                                            @if (model.details?.quantization_level) {
-                                            <span class="badge badge-sm badge-ghost gap-1" title="Quantization">
-                                                {{ model.details?.quantization_level }}
-                                            </span>
-                                            }
-                                            @if (model.details?.family) {
-                                            <span class="badge badge-sm badge-ghost gap-1 bg-opacity-50">
-                                                {{ model.details?.family }}
-                                            </span>
-                                            }
-                                        </div>
-                                        <div class="text-xs text-secondary opacity-70">
-                                            Modified: {{ model.modified_at | date:'medium' }}
+                                            <span class="badge badge-sm badge-ghost">GGUF</span>
                                         </div>
                                     </div>
-                                    <button (click)="handleDeleteModel(model.name)"
-                                        class="btn-icon text-error hover:bg-error hover:bg-opacity-10 p-2 rounded-lg transition-colors">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                    </button>
                                 </div>
                             </div>
                             }
-                            @if (!settingsService.models()?.models?.length) {
+                            @if (!ggufModels().length) {
                             <div class="p-8 text-center text-secondary">
-                                No models installed. Go to "Discover Models" to find one.
+                                No .gguf models found in the models/ folder. Go to "Discover Models" or "Manage Models" to add one.
                             </div>
                             }
                         </div>
@@ -488,13 +456,12 @@
                 }
 
                 <!-- Tab: Import -->
-                @if (activeTab() === 'import') {
+                @if (activeTab() === 'manage') {
                 <div class="space-y-6 anime-fade-in">
                     <div class="bg-panel border border-divider rounded-xl p-4 sm:p-6">
-                        <h2 class="text-lg font-semibold mb-4">Import GGUF Files</h2>
-                        <h3 class="card-title text-lg mb-4">Import GGUF Files</h3>
+                        <h2 class="text-lg font-semibold mb-4">Manage Model Files</h2>
                         <p class="text-sm text-secondary mb-6">
-                            Import custom GGUF model files. You can upload a file directly or scan the imports folder.
+                            Manage GGUF model files in your models folder. Upload new files or view existing ones.
                         </p>
 
                         <div class="flex gap-2 mb-6">
@@ -504,15 +471,6 @@
                                         d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                                 Scan for GGUF Files
-                            </button>
-
-                            <button (click)="handleBatchImport()" class="btn-secondary flex items-center gap-2"
-                                [disabled]="importFiles().length === 0">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                </svg>
-                                Batch Import All
                             </button>
 
                             <button class="btn-secondary flex items-center gap-2" (click)="fileInput.click()">
@@ -529,31 +487,21 @@
                         <div class="space-y-3">
                             @for (file of importFiles(); track file) {
                             <div class="bg-input rounded-lg p-4">
-                                <div class="flex items-start justify-between gap-4 mb-3">
-                                    <div class="flex-1">
-                                        <p class="font-mono text-sm mb-1">{{ file }}</p>
-                                        <p class="text-xs" [ngClass]="getImportStatus(file).class">
-                                            {{ getImportStatus(file).text }}
-                                        </p>
+                                <div class="flex items-center justify-between gap-4">
+                                    <div class="flex items-center gap-3 flex-1">
+                                        <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        <p class="font-mono text-sm">{{ file }}</p>
                                     </div>
-                                    <input type="radio" name="import-file" [value]="file"
-                                        (change)="selectImportFile(file)" [checked]="selectedImportFile() === file"
-                                        class="radio radio-sm radio-accent">
+                                    <span class="badge badge-success badge-sm">Ready to use</span>
                                 </div>
-                                @if (selectedImportFile() === file) {
-                                <div class="flex gap-2">
-                                    <input type="text" placeholder="Model name (e.g., llama3:8b)"
-                                        [(ngModel)]="importModelName"
-                                        class="flex-1 px-3 py-2 bg-panel border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-sm border">
-                                    <button (click)="handleImportModel()" class="btn-primary text-sm">Import
-                                        Model</button>
-                                </div>
-                                }
                             </div>
                             }
                             @if (importFiles().length === 0) {
                             <div class="text-center text-secondary py-4">
-                                No .gguf files found. Place them in the import folder and click Scan.
+                                No .gguf files found in the models folder. Upload a file or download one from "Discover Models".
                             </div>
                             }
                         </div>
