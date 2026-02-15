@@ -213,3 +213,5 @@ llm_repetition_problem_explained.txt
 pdf_workflow_diagram.txt
 huggingface_requests_explained.txt
 nul
+.last_build
+.last_build_dev
