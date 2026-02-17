@@ -1,6 +1,7 @@
 <!-- Main Layout Wrapper -->
 <div class="flex flex-col h-full w-full relative" (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)"
     (drop)="onDrop($event)">
+
     <input #fileInput type="file" accept="image/*" class="hidden" (change)="onFileSelected($event)" />
 
     <!-- Drag Overlay -->
@@ -19,7 +20,7 @@
     }
 
     <!-- Chat Header -->
-    <div class="sticky top-0 z-30 bg-base-subtle border-b border-divider backdrop-blur-sm flex-shrink-0">
+    <div class="sticky top-0 z-30 bg-base-subtle/80 border-b border-divider backdrop-blur-md flex-shrink-0">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 py-3">
             <div class="flex items-center justify-between">
                 <h2 class="text-base sm:text-lg font-semibold text-primary truncate">
@@ -47,21 +48,26 @@
     </div>
 
     <!-- Messages Area (Flex Grow + Scroll) -->
-    <div #scrollContainer class="flex-1 overflow-y-auto scroll-smooth w-full">
+    <div #scrollContainer class="flex-1 overflow-y-auto scroll-smooth w-full relative z-10">
         <div class="w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 pb-20">
 
             <!-- Empty State -->
             @if (chatService.messages().length === 0) {
             <div class="flex flex-col items-center justify-center pt-md-10 pt-sm-3 text-center">
-                <div
-                    class="w-16 h-16 bg-gradient-to-br from-accent to-accent-dark rounded-2xl flex items-center justify-center mb-6 shadow-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles-icon lucide-sparkles"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg>
+                <!-- Video Logo with Text Overlay -->
+                <div class="relative w-full max-w-md sm:max-w-lg mb-4 flex items-center justify-center" style="aspect-ratio: 16/9;">
+                    <img src="mnemosyne-w.gif" alt="MNEMOS" class="absolute inset-0 w-full h-full object-contain" style="opacity: 35%">
+                    <h1 class="relative z-10 text-4xl sm:text-5xl font-bold text-primary font-brand drop-shadow-lg">MNEMOS
+
+                        <br>
+                    <p class="relative z-10 text-sm text-secondary">hyperstition toolkit</p>
+
+                    </h1>
                 </div>
-                <h2 class="text-2xl sm:text-3xl font-bold text-primary mb-3">Welcome to</h2>
-                <h1 class="text-2xl sm:text-3xl font-bold text-primary mb-3  font-brand">  MNEMOS </h1>
-                <p class="text-secondary text-sm sm:text-base max-w-md mb-8">
+                <!-- <h2 class="text-2xl sm:text-3xl font-bold text-primary mb-3">Welcome to</h2> -->
+                <!-- <p class="text-secondary text-sm sm:text-base max-w-md mb-8">
                     Start a conversation with AI or upload documents for context-aware responses
-                </p>
+                </p> -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">
                     <button (click)="modalService.openUpload()"
                         class="p-4 bg-panel border border-divider rounded-xl hover:bg-hover transition-all text-left group">
