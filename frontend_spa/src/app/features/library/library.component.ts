@@ -27,10 +27,11 @@ import { LibraryDocumentModalComponent } from './library-document-modal/library-
 
       <!-- Document Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto flex-grow content-start">
-        <div *ngFor="let doc of filteredDocuments()"
-             class="bg-panel rounded-lg shadow-sm border border-divider hover:shadow-md transition-all relative group"
+        @for (doc of filteredDocuments(); track doc.id) {
+        <div class="bg-panel rounded-lg shadow-sm border border-divider hover:shadow-md hover:bg-base-200/50 transition-all relative group cursor-pointer flex flex-col h-full"
              [class.bg-accent]="doc.selected"
-             [class.bg-opacity-10]="doc.selected">
+             [class.bg-opacity-10]="doc.selected"
+             (click)="openDocument(doc)">
 
              <!-- Checkbox (top-right, clean design) -->
              <label class="absolute top-2 right-2 z-10 cursor-pointer flex items-center justify-center w-6 h-6 rounded bg-base-100/80 hover:bg-base-100 backdrop-blur-sm transition-all"
@@ -41,23 +42,28 @@ import { LibraryDocumentModalComponent } from './library-document-modal/library-
                        [checked]="doc.selected"
                        (change)="toggleDocumentSelection(doc.id)"
                        class="sr-only" />
-                <svg *ngIf="doc.selected" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                @if (doc.selected) {
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
                   <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                 </svg>
-                <svg *ngIf="!doc.selected" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-secondary opacity-60">
+                } @else {
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-secondary opacity-60">
                   <rect x="4" y="4" width="16" height="16" rx="2" />
                 </svg>
+                }
              </label>
 
-             <div class="flex justify-between items-start mb-2 cursor-pointer p-4" (click)="openDocument(doc)">
+             <div class="flex justify-between items-start mb-2 p-4">
                 <span class="px-2 py-0.5 text-xs font-medium border border-divider rounded-full text-secondary">{{ doc.file_type | uppercase }}</span>
-                <div *ngIf="doc.stars" class="flex text-warning">
-                    <ng-container *ngFor="let i of [].constructor(doc.stars)">
+                @if (doc.stars) {
+                <div class="flex text-warning">
+                    @for (i of [].constructor(doc.stars); track $index) {
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3 h-3">
                             <path fill-rule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z" clip-rule="evenodd" />
                         </svg>
-                    </ng-container>
+                    }
                 </div>
+                }
              </div>
 
              <h2 class="text-sm font-semibold mb-2 line-clamp-2 min-h-[2.5rem] px-4" [title]="doc.original_filename">
@@ -66,16 +72,21 @@ import { LibraryDocumentModalComponent } from './library-document-modal/library-
 
              <div class="flex items-center justify-between text-xs text-secondary mt-auto py-2 px-4 border-t border-divider">
                 <span>{{ doc.created_at | date:'mediumDate' }}</span>
-                <span *ngIf="doc.collection_id" class="px-2 py-0.5 bg-hover rounded-full max-w-[50%] truncate">
+                @if (doc.collection_id) {
+                <span class="px-2 py-0.5 bg-hover rounded-full max-w-[50%] truncate">
                     {{ getCollectionName(doc.collection_id) }}
                 </span>
+                }
              </div>
         </div>
+        }
         
         <!-- Empty State -->
-        <div *ngIf="filteredDocuments().length === 0" class="col-span-full text-center py-10 opacity-50">
+        @if (filteredDocuments().length === 0) {
+        <div class="col-span-full text-center py-10 opacity-50">
             No documents found matching filters.
         </div>
+        }
       </div>
 
       <!-- Document Modal -->

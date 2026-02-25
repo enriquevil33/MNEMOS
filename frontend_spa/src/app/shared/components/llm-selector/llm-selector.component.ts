@@ -28,7 +28,7 @@ export class LlmSelectorComponent {
   preferences = input<ChatPreferences | null>(null);
 
   // Internal State
-  selectedProvider = signal<string>('ollama');
+  selectedProvider = signal<string>('llamacpp');
   apiKey = signal<string>('');
   baseUrl = signal<string>('');
   customModelId = signal<string>('');
@@ -94,8 +94,8 @@ export class LlmSelectorComponent {
     effect(() => {
       const prefs = this.preferences();
       if (prefs) {
-        this.selectedProvider.set(prefs.llm_provider || 'ollama');
-        this.initFromPrefs(prefs.llm_provider || 'ollama', prefs);
+        this.selectedProvider.set(prefs.llm_provider || 'llamacpp');
+        this.initFromPrefs(prefs.llm_provider || 'llamacpp', prefs);
 
         if (prefs.active_connection_id) {
           this.selectedConnectionId.set(prefs.active_connection_id);
@@ -131,11 +131,7 @@ export class LlmSelectorComponent {
     this.customModelId.set('');
 
     // Set model
-    if (provider === 'ollama') {
-      this.selectedModel.set(prefs.selected_llm_model || this.settingsService.currentModel() || '');
-    } else {
-      this.selectedModel.set(prefs.selected_llm_model || '');
-    }
+    this.selectedModel.set(prefs.selected_llm_model || '');
 
     switch (provider) {
       case 'openai':
@@ -150,10 +146,9 @@ export class LlmSelectorComponent {
         break;
       case 'lm_studio':
       case 'custom':
-      case 'ollama':
       case 'llamacpp':
         this.baseUrl.set(prefs.local_llm_base_url || '');
-        if (provider !== 'ollama' && provider !== 'llamacpp') this.customModelId.set(prefs.selected_llm_model || '');
+        if (provider !== 'llamacpp') this.customModelId.set(prefs.selected_llm_model || '');
         break;
     }
   }
@@ -165,9 +160,6 @@ export class LlmSelectorComponent {
   currentModels = computed(() => {
     let models: any[] = [];
     switch (this.selectedProvider()) {
-      case 'ollama':
-        models = this.settingsService.models()?.models.map(m => ({ name: m.name, vision: !!m.vision })) || [];
-        break;
       case 'openai':
         models = this.openaiModels;
         break;
@@ -360,7 +352,7 @@ export class LlmSelectorComponent {
     if (provider === 'anthropic') update.anthropic_api_key = this.apiKey();
     if (provider === 'groq') update.groq_api_key = this.apiKey();
 
-    if (['ollama', 'lm_studio', 'llamacpp'].includes(provider)) {
+    if (['lm_studio', 'llamacpp'].includes(provider)) {
       update.local_llm_base_url = this.baseUrl();
     }
 
@@ -372,8 +364,6 @@ export class LlmSelectorComponent {
 
     if (this.isManualModelInput()) {
       update.selected_llm_model = this.customModelId();
-    } else if (provider === 'ollama') {
-      update.ollamaModel = this.selectedModel(); // Special handling for Ollama
     } else if (provider === 'llamacpp') {
       update.selected_llm_model = this.selectedModel(); // For llamacpp, store the selected .gguf filename
     } else if (provider === 'custom') {

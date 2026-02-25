@@ -1,0 +1,96 @@
+<div class="space-y-6 anime-fade-in">
+    <!-- Search & Filter -->
+    <div class="bg-panel border border-divider rounded-xl p-4 sm:p-6">
+        <div class="flex flex-col sm:flex-row gap-3">
+            <input type="text" placeholder="Search models..." [(ngModel)]="searchQuery" (keyup.enter)="searchLibrary()"
+                class="flex-1 px-4 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent text-sm">
+            <button (click)="searchLibrary()" class="btn-primary">Search</button>
+        </div>
+    </div>
+
+    <!-- Models Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        @if (isSearching()) {
+        <!-- Skeleton Loader -->
+        @for (i of [1,2,3,4,5,6]; track i) {
+        <div class="bg-panel border border-divider rounded-xl p-4 sm:p-6">
+            <div class="flex items-start justify-between mb-3">
+                <div class="space-y-2 w-full">
+                    <div class="h-5 w-3/4 bg-divider rounded pulse"></div>
+                    <div class="h-3 w-1/2 bg-divider rounded pulse"></div>
+                </div>
+                <div class="h-5 w-16 bg-divider rounded-full pulse"></div>
+            </div>
+            <div class="space-y-2 mb-4">
+                <div class="h-3 w-full bg-divider rounded pulse"></div>
+                <div class="h-3 w-5/6 bg-divider rounded pulse"></div>
+            </div>
+            <div class="flex justify-between mb-4">
+                <div class="h-3 w-16 bg-divider rounded pulse"></div>
+                <div class="h-3 w-16 bg-divider rounded pulse"></div>
+            </div>
+            <div class="flex gap-2">
+                <div class="h-9 w-full bg-divider rounded-lg pulse"></div>
+            </div>
+        </div>
+        }
+        } @else {
+        @for (model of searchResults(); track model.name) {
+        <div class="bg-panel border border-divider rounded-xl p-4 sm:p-6 hover:border-accent transition-colors">
+            <div class="flex items-start justify-between mb-3">
+                <div>
+                    <h3 class="font-mono font-semibold mb-1 text-base-content">{{
+                        model.name
+                        }}</h3>
+                    <p class="text-xs text-base-content/80">{{ model.author }} • {{ model.params }}
+                    </p>
+                </div>
+                <span class="badge" [class.badge-success]="!model.is_hf_only" [class.badge-warning]="model.is_hf_only">
+                    {{ model.is_hf_only ? 'HF Only' : 'Compatible' }}
+                </span>
+            </div>
+            <p class="text-sm text-base-content/80 mb-4 line-clamp-2">
+                {{ model.description }}
+            </p>
+            <div class="flex items-center justify-between text-xs text-base-content/80 mb-4">
+                <span>Size: {{ model.size_gb }} GB</span>
+                <span>Min RAM: {{ model.min_ram_gb }} GB</span>
+            </div>
+            <div class="flex gap-2 mb-4 flex-wrap">
+                @for (tag of model.tags; track tag) {
+                <span class="px-2 py-1 bg-accent-subtle text-accent rounded text-xs">{{ tag
+                    }}</span>
+                }
+            </div>
+
+            <div class="flex gap-2">
+                <!-- <button (click)="handlePullModel(model.ollama_name || model.name)"
+                    class="flex-1 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-dark transition-colors text-sm font-medium">
+                    Pull (Ollama)
+                </button> -->
+                @if (model.full_name && model.full_name.includes('/')) {
+                <button (click)="openGgufModal(model.full_name)"
+                    class="w-full px-4 py-2 bg-secondary text-base-100 rounded-lg hover:bg-primary-focus transition-colors text-sm font-medium hover:bg-accent-dark"
+                    title="Download specific GGUF file directly">
+                    GGUF Model
+                </button>
+                }
+
+                @if (model.hf_url) {
+                <a [href]="model.hf_url" target="_blank"
+                    class="px-3 py-2 bg-base-200 text-base-content hover:bg-base-300 rounded-lg flex items-center justify-center transition-colors"
+                    title="View on Hugging Face">
+                    <img src="huggingFace.svg" class="w-5 h-5" alt="Hugging Face" aria-hidden="true">
+                </a>
+                }
+            </div>
+        </div>
+        }
+        @if (searchResults().length === 0) {
+        <div class="col-span-2 text-center py-10 text-secondary">
+            Search for models to discover new capabilities.
+        </div>
+        }
+        }
+    </div>
+</div>

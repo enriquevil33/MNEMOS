@@ -6,13 +6,14 @@ services:
     depends_on:
       - app
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80" ]
       interval: 3s
       timeout: 3s
       retries: 10
 
   app:
     build: .
+    image: mnemos-backend:latest
     ports:
       - "5000:5000"
     environment:
@@ -54,6 +55,7 @@ services:
 
   worker:
     build: .
+    image: mnemos-backend:latest
     command: celery -A app.celery_app worker --loglevel=info --pool=solo
     environment:
       - DATABASE_URL=postgresql://mnemos_user:mnemos_pass@db:5432/mnemos_db
@@ -93,19 +95,15 @@ services:
     # Run 'docker compose pull llamacpp' to get updates
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
     pull_policy: always
-    profiles: ["llamacpp"]  # Only starts when model exists
     ports:
       - "8082:8080"
     environment:
       - LLAMACPP_NUM_CTX=${LLAMACPP_NUM_CTX:-16384}
+      - LLAMACPP_MODEL_PATH=${LLAMACPP_MODEL_PATH}
     volumes:
       - ./models:/models
-    command: >
-      --port 8080
-      --host 0.0.0.0
-      -m ${LLAMACPP_MODEL_PATH:-/models/Hermes-3-Llama-3.2-3B.Q4_K_M.gguf}
-      -ngl 999
-      -c 16384
+      - ./llamacpp-entrypoint.sh:/llamacpp-entrypoint.sh:ro
+    entrypoint: [ "/bin/bash", "/llamacpp-entrypoint.sh" ]
     deploy:
       resources:
         reservations:
@@ -114,9 +112,16 @@ services:
               count: 1
               capabilities: [ gpu ]
     restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   mcp:
     build: .
+    image: mnemos-backend:latest
     # Keep container running - MCP will be accessed via stdio (docker exec)
     # OpenCode will call: docker exec -i dev-mcp-1 python -m app.mcp_server.server
     command: tail -f /dev/null

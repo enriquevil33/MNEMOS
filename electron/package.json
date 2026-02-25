@@ -1,0 +1,116 @@
+{
+  "name": "mnemos",
+  "version": "1.0.0",
+  "description": "MNEMOS - AI-Powered Context & Memory System",
+  "main": "main.js",
+  "author": "MNEMOS Team",
+  "license": "AGPL-3.0",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder --win --x64",
+    "build:portable": "electron-builder --win --x64 portable",
+    "pack": "electron-builder --dir",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "electron-log": "^5.2.4",
+    "electron-store": "^8.1.0",
+    "ps-node": "^0.1.6",
+    "tree-kill": "^1.2.2",
+    "node-fetch": "^2.7.0",
+    "extract-zip": "^2.0.1",
+    "tar": "^7.4.3"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.mnemos.app",
+    "productName": "MNEMOS",
+    "copyright": "Copyright © 2026 MNEMOS",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "**/*",
+      "!resources/downloads/**",
+      "!node_modules/**/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!node_modules/**/{test,__tests__,tests,powered-test,example,examples}",
+      "!node_modules/**/*.d.ts",
+      "!node_modules/**/{.github,.vscode,.idea,.git}",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../app",
+        "to": "app/app",
+        "filter": ["**/*", "!**/__pycache__/**"]
+      },
+      {
+        "from": "../config",
+        "to": "app/config",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../migrations",
+        "to": "app/migrations",
+        "filter": ["**/*", "!**/__pycache__/**"]
+      },
+      {
+        "from": "../frontend_spa/dist/frontend_theme3/browser",
+        "to": "app/frontend",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../requirements.txt",
+        "to": "app/requirements.txt"
+      },
+      {
+        "from": "../.env.example",
+        "to": "app/.env.example"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MNEMOS",
+      "include": "build/installer.nsh",
+      "perMachine": true,
+      "runAfterFinish": true
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}.${ext}"
+    },
+    "compression": "maximum",
+    "publish": {
+      "provider": "github",
+      "owner": "your-github-username",
+      "repo": "mnemos"
+    }
+  }
+}

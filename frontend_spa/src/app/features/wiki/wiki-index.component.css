@@ -2,9 +2,16 @@
    Wiki Index — Wikipedia-style alphabetical listing
    ============================================ */
 
-.wiki-index-layout {
+/* Host selector ensures it takes up full route outlet space */
+:host {
+  display: block;
   height: 100%;
+  width: 100%;
   overflow-y: auto;
+  /* Scrollbar here at the exact edge */
+}
+
+.wiki-index-layout {
   max-width: 860px;
   width: 100%;
   margin: 0 auto;

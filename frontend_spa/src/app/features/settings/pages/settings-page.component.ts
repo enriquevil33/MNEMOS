@@ -1,21 +1,34 @@
-import { Component, signal, inject, OnInit, computed, viewChild } from '@angular/core';
+import { Component, signal, inject, OnInit, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { SettingsService } from '@services/settings.service';
-import { ChatPreferences, SystemPrompt } from '@core/models';
-import { ProgressBarComponent } from '@shared/components/progress-bar/progress-bar.component';
-import { LlmSelectorComponent } from '@shared/components/llm-selector/llm-selector.component';
 import { ToastrService } from 'ngx-toastr';
 import { AppRoutes } from '@core/constants/app-routes';
 
 import { PluginsSettingsComponent } from '../components/plugins-settings/plugins-settings.component';
-import { LlmGenerationParamsComponent } from '../components/llm-generation-params/llm-generation-params.component';
+import { SettingsActiveDownloadsComponent } from '../components/settings-active-downloads/settings-active-downloads.component';
+import { SettingsModelsTabComponent } from '../components/settings-models-tab/settings-models-tab.component';
+import { SettingsDiscoverTabComponent } from '../components/settings-discover-tab/settings-discover-tab.component';
+import { SettingsManageTabComponent } from '../components/settings-manage-tab/settings-manage-tab.component';
+import { SettingsVoiceTabComponent } from '../components/settings-voice-tab/settings-voice-tab.component';
+import { SettingsChatTabComponent } from '../components/settings-chat-tab/settings-chat-tab.component';
 
 @Component({
     selector: 'app-settings-page',
     standalone: true,
-    imports: [CommonModule, RouterLink, FormsModule, ProgressBarComponent, LlmSelectorComponent, PluginsSettingsComponent, LlmGenerationParamsComponent],
+    imports: [
+        CommonModule,
+        RouterLink,
+        FormsModule,
+        PluginsSettingsComponent,
+        SettingsActiveDownloadsComponent,
+        SettingsModelsTabComponent,
+        SettingsDiscoverTabComponent,
+        SettingsManageTabComponent,
+        SettingsVoiceTabComponent,
+        SettingsChatTabComponent
+    ],
     host: { class: 'flex flex-col h-full w-full' },
     templateUrl: './settings-page.component.html',
     styleUrl: './settings-page.component.css'
@@ -24,172 +37,29 @@ export class SettingsPage implements OnInit {
     settingsService = inject(SettingsService);
     toastr = inject(ToastrService);
     protected readonly AppRoutes = AppRoutes;
-    // Use template refs to distinguish
-    chatSelector = viewChild<LlmSelectorComponent>('chatSelector');
-    memorySelector = viewChild<LlmSelectorComponent>('memorySelector');
 
     activeTab = signal<'models' | 'discover' | 'manage' | 'chat' | 'voice' | 'plugins'>('models');
 
-    // GGUF Models (for llama.cpp)
     ggufModels = signal<any[]>([]);
     currentGgufModel = signal<string>('');
 
-    // Proxy for Memory Selector
-    // Maps memory_* fields to llm_* fields so LlmSelectorComponent works as is
-    memoryLlmPreferences = computed(() => {
-        const prefs = this.settingsService.chatPreferences();
-        if (!prefs) return null;
-        return {
-            ...prefs,
-            llm_provider: prefs.memory_provider,
-            selected_llm_model: prefs.memory_llm_model
-        } as ChatPreferences;
-    });
-
-    // Prompt Modal
-    isPromptModalOpen = signal<boolean>(false);
-    editingPromptId = signal<string | null>(null);
-    promptForm = signal<{ title: string, content: string }>({ title: '', content: '' });
-
-
-
-    // Helper to get active custom connection for transcription
-    getTranscriptionConnection() {
-        const providerId = this.settingsService.chatPreferences()?.transcription_provider;
-        if (!providerId || ['local', 'groq', 'openai', 'deepgram'].includes(providerId)) return null;
-        return this.settingsService.llmConnections().find(c => c.id === providerId);
-    }
-
-    // Chat Preferences
-    async handleSaveChatPreferences() {
-        const currentPrefs = this.settingsService.chatPreferences();
-        if (!currentPrefs) return;
-
-        // 1. Get Chat LLM settings
-        const chatSel = this.chatSelector();
-        let chatUpdate: any = {};
-        let ollamaModelToSet: string | undefined;
-
-        try {
-            if (chatSel) {
-                const snapshot = chatSel.getSnapshot();
-
-                // Unified Save: If user is editing a custom connection, save it first
-                if (snapshot.llm_provider === 'custom') {
-                    // Check if form is valid (naive check via internal signals logic or just try save)
-                    // The saveConnection method in child throws if invalid? No, it just errors.
-                    // Ideally we check validity. 
-                    // Accessing internal computed/signals: chatSel.connForm.name(), etc.
-                    const name = chatSel.connForm.name();
-                    const url = chatSel.connForm.baseUrl();
-                    const key = chatSel.connForm.apiKey();
-                    const isNew = chatSel.selectedConnectionId() === 'new';
-                    const defaultModel = chatSel.connForm.defaultModel();
-
-                    // Only attempt save if it looks valid to avoid error toasts for half-filled forms
-                    if (name && url) {
-                        try {
-                            await chatSel.saveConnection();
-                            // Fetch fresh snapshot after save (in case ID changed from 'new' to 'uuid')
-                            const newSnapshot = chatSel.getSnapshot();
-                            Object.assign(snapshot, newSnapshot);
-
-                            this.toastr.info('Connection details updated automatically', 'Unified Save');
-                        } catch (e) {
-                            console.warn("Auto-save of connection failed", e);
-                            // Don't block main save, but maybe warn?
-                        }
-                    }
-                }
-
-                ollamaModelToSet = snapshot.ollamaModel;
-                delete snapshot.ollamaModel;
-                chatUpdate = snapshot;
-            }
-
-            // 2. Get Memory LLM settings
-            const memSel = this.memorySelector();
-            let memUpdate: any = {};
-
-            if (memSel) {
-                const snapshot = memSel.getSnapshot();
-                // Map back: llm_provider -> memory_provider
-                memUpdate.memory_provider = snapshot.llm_provider;
-                // Map back: selected_llm_model OR ollamaModel -> memory_llm_model
-                memUpdate.memory_llm_model = snapshot.selected_llm_model || snapshot.ollamaModel;
-
-                // Allow updating keys from here too? Yes, keys are global.
-                if (snapshot.openai_api_key) memUpdate.openai_api_key = snapshot.openai_api_key;
-                if (snapshot.anthropic_api_key) memUpdate.anthropic_api_key = snapshot.anthropic_api_key;
-                if (snapshot.groq_api_key) memUpdate.groq_api_key = snapshot.groq_api_key;
-                if (snapshot.custom_api_key) memUpdate.custom_api_key = snapshot.custom_api_key;
-                if (snapshot.local_llm_base_url) memUpdate.local_llm_base_url = snapshot.local_llm_base_url;
-            }
-
-            // Merge updates
-            const finalPrefs: ChatPreferences = {
-                ...currentPrefs,
-                ...chatUpdate,
-                ...memUpdate
-            };
-
-            await this.settingsService.saveChatPreferences(finalPrefs);
-
-            if (ollamaModelToSet) {
-                await this.settingsService.setCurrentModel(ollamaModelToSet);
-            }
-            this.toastr.success('Settings saved successfully');
-        } catch (e: any) {
-            console.error(e);
-            const msg = e.error?.error || 'Failed to save settings. Please check your inputs.';
-            this.toastr.error(msg, 'Error saving settings');
-        }
-    }
-    // Import State
     importFiles = signal<string[]>([]);
     importModelName = signal<string>('');
     selectedImportFile = signal<string>('');
 
-    // Heuristic to check if file is already imported
-    getImportStatus(filename: string): { text: string, class: string } {
-        const basename = filename.toLowerCase().replace('.gguf', '');
-        const models = this.settingsService.models()?.models || [];
-
-        // Check if any model name contains the basename (or vice versa, roughly)
-        // User typically names it similarly. 
-        // e.g. file: "DeepSeek-R1.gguf", model: "deepseek-r1:latest"
-        const isUrl = (s: string) => s.includes(':'); // simplistic check for "name:tag"
-
-        const exists = models.some(m => {
-            const mName = m.name.toLowerCase();
-            const mBase = mName.split(':')[0]; // ignore tag
-            return mName.includes(basename) || basename.includes(mBase);
-        });
-
-        if (exists) {
-            return { text: 'Already imported (Ready to use)', class: 'text-success' };
-        }
-        return { text: 'Ready to import', class: 'text-secondary' };
-    }
-
-    selectImportFile(file: string) {
-        this.selectedImportFile.set(file);
-        // Auto-populate model name: remove extension, lowercase
-        const name = file.replace(/\.gguf$/i, '').toLowerCase();
-        this.importModelName.set(name);
-    }
-
-    // Discover State
     searchQuery = signal<string>('');
     searchResults = signal<any[]>([]);
     isSearching = signal<boolean>(false);
 
-    // Download State
     activeDownloads = signal<{ [key: string]: any }>({});
     activeDownloadsList = computed(() => Object.values(this.activeDownloads()));
     private pollInterval: any;
 
-    constructor() { }
+    isGgufModalOpen = signal<boolean>(false);
+    ggufFiles = signal<{ filename: string, size_mb: number, quantization: string }[]>([]);
+    loadingGgufFiles = signal<boolean>(false);
+    selectedRepoId = signal<string | null>(null);
+    hardwareInfo = signal<{ ram_available: number, vram_available: number, gpu_name: string | null } | null>(null);
 
     ngOnInit() {
         this.loadAllData();
@@ -201,9 +71,7 @@ export class SettingsPage implements OnInit {
     }
 
     async loadAllData() {
-        // Load GGUF models for llama.cpp
         await this.loadGgufModels();
-
         await Promise.all([
             this.settingsService.loadChatPreferences(),
             this.settingsService.loadSystemPrompts(),
@@ -216,8 +84,6 @@ export class SettingsPage implements OnInit {
         try {
             const response = await this.settingsService.getLlamacppModels();
             this.ggufModels.set(response.models);
-
-            // Load current model from preferences
             const prefs = this.settingsService.chatPreferences();
             if (prefs?.llm_provider === 'llamacpp' && prefs?.selected_llm_model) {
                 this.currentGgufModel.set(prefs.selected_llm_model);
@@ -228,18 +94,17 @@ export class SettingsPage implements OnInit {
     }
 
     async startDownloadPolling() {
-        this.pollDownloads(); // Initial check
+        this.pollDownloads();
         this.pollInterval = setInterval(() => this.pollDownloads(), 2000);
     }
 
     async pollDownloads() {
         try {
-            const activePulls = await this.settingsService.getActivePulls(); // Returns array of { task_id, model_name, ... }
+            const activePulls = await this.settingsService.getActivePulls();
 
             const currentDownloads = { ...this.activeDownloads() };
             let hasChanges = false;
 
-            // Update known downloads or add new ones
             let pullsArray: any[] = [];
             if (Array.isArray(activePulls)) {
                 pullsArray = activePulls;
@@ -248,32 +113,24 @@ export class SettingsPage implements OnInit {
             }
 
             for (const pull of pullsArray) {
-                // Fetch latest status/progress for this task
                 try {
-                    // Start with basic pull info
                     let merged = { ...pull };
-
-                    // Parse progress_line if it exists (It's a JSON string from backend)
                     if (merged.progress_line && typeof merged.progress_line === 'string') {
                         try {
                             const progressData = JSON.parse(merged.progress_line);
                             if (progressData.total && progressData.completed) {
                                 merged.total = progressData.total;
                                 merged.completed = progressData.completed;
-                                // Calculate progress immediately for consistency
                                 merged.progress = (merged.completed / merged.total) * 100;
                             }
-                            // Also update status message if available
                             if (progressData.status) {
-                                merged.status = progressData.status; // e.g. "pulling sha256..."
+                                merged.status = progressData.status;
                             }
                         } catch (e) {
                             console.warn("Failed to parse progress_line", e);
                         }
                     }
 
-                    // Normalize Status for UI
-                    // If Celery says SUCCESS but result has error -> Error
                     if (merged.status === 'SUCCESS' && merged.result && merged.result.status === 'error') {
                         merged.status = 'failure';
                         merged.error = merged.result.error;
@@ -281,25 +138,18 @@ export class SettingsPage implements OnInit {
                         merged.status = 'success';
                         merged.progress = 100;
 
-                        // Auto-dismiss success after 5 seconds
-                        // First check if we already scheduled it
                         if (!currentDownloads[pull.task_id]?.dismissScheduled) {
                             merged.dismissScheduled = true;
-                            // Trigger model refresh so new model appears in list
                             this.settingsService.loadModels();
-
                             setTimeout(() => {
                                 const now = { ...this.activeDownloads() };
-                                // Only delete if it's still success (user might have deleted it manually)
                                 if (now[pull.task_id] && now[pull.task_id].status === 'success') {
                                     delete now[pull.task_id];
                                     this.activeDownloads.set(now);
-                                    // Also try to clean up backend if possible, but frontend-only dismissal is fine for UX
                                     this.settingsService.deletePull(pull.task_id).catch(() => { });
                                 }
                             }, 5000);
                         } else {
-                            // Preserve scheduled flag
                             merged.dismissScheduled = true;
                         }
 
@@ -314,16 +164,9 @@ export class SettingsPage implements OnInit {
                 }
             }
 
-            // Remove downloads that are no longer active (completed/failed and removed from backend list)
-            // Filter out keys in currentDownloads that are not in activePulls
             const activeIds = new Set(pullsArray.map(p => p.task_id));
             Object.keys(currentDownloads).forEach(id => {
-                // If it's not in backend list AND not scheduled for dismissal (meaning it's gone abruptly)
-                // Or if it IS in backend list but we track it locally
                 if (!activeIds.has(id)) {
-                    // If it was validly removed (e.g. by delete button), let it go.
-                    // But if it finished and backend cleared it, we might want to show it?
-                    // For now, sync with backend, except if we are holding it for dismissal
                     if (!currentDownloads[id].dismissScheduled) {
                         delete currentDownloads[id];
                         hasChanges = true;
@@ -345,27 +188,14 @@ export class SettingsPage implements OnInit {
         if (tab === 'manage') {
             this.scanImports();
         } else if (tab === 'discover') {
-            // Only search if empty to encourage discovery but avoid re-fetch on every tab switch if not needed?
-            // User probably wants to see results if they return.
             if (this.searchResults().length === 0) {
                 this.searchLibrary();
             }
         }
     }
 
-    // Models
-    async handleDeleteModel(modelName: string) {
-        if (!confirm(`Are you sure you want to delete ${modelName}?`)) return;
-        await this.settingsService.deleteModel(modelName);
-    }
-
-    async handleSetCurrentModel(modelName: string) {
-        await this.settingsService.setCurrentModel(modelName);
-    }
-
     async handleSetCurrentGgufModel(filename: string) {
         try {
-            // Update preferences to use llamacpp with this model
             await this.settingsService.saveChatPreferences({
                 llm_provider: 'llamacpp',
                 selected_llm_model: filename
@@ -378,7 +208,6 @@ export class SettingsPage implements OnInit {
         }
     }
 
-    // Discover
     async searchLibrary() {
         this.isSearching.set(true);
         try {
@@ -394,24 +223,43 @@ export class SettingsPage implements OnInit {
     async handlePullModel(modelName: string) {
         try {
             const res = await this.settingsService.pullModel({ model: modelName });
-            // Add to local state immediately to show feedback
             this.activeDownloads.update(d => ({
                 ...d,
                 [res.task_id]: { task_id: res.task_id, model: modelName, status: 'starting', progress: 0 }
             }));
-            alert(`Started pulling ${modelName}`);
+            this.toastr.info(`Started pulling ${modelName}`);
         } catch (err) {
-            alert('Failed to start pull');
+            this.toastr.error('Failed to start pull');
         }
     }
 
-    // Import
     async scanImports() {
         const files = await this.settingsService.scanImports();
         this.importFiles.set(files);
         if (files.length > 0) {
             this.selectImportFile(files[0]);
         }
+    }
+
+    selectImportFile(file: string) {
+        this.selectedImportFile.set(file);
+        const name = file.replace(/\.gguf$/i, '').toLowerCase();
+        this.importModelName.set(name);
+    }
+
+    getImportStatus(filename: string): { text: string, class: string } {
+        const basename = filename.toLowerCase().replace('.gguf', '');
+        const models = this.settingsService.models()?.models || [];
+        const exists = models.some(m => {
+            const mName = m.name.toLowerCase();
+            const mBase = mName.split(':')[0];
+            return mName.includes(basename) || basename.includes(mBase);
+        });
+
+        if (exists) {
+            return { text: 'Already imported (Ready to use)', class: 'text-success' };
+        }
+        return { text: 'Ready to import', class: 'text-secondary' };
     }
 
     async handleFileUpload(event: Event) {
@@ -442,8 +290,8 @@ export class SettingsPage implements OnInit {
             const res = await this.settingsService.uploadModel(file);
             if (res.success) {
                 this.toastr.success('File uploaded successfully', 'Upload Complete');
-                await this.scanImports(); // Refresh list
-                this.selectImportFile(res.filename); // Auto-select new file
+                await this.scanImports();
+                this.selectImportFile(res.filename);
 
                 this.activeDownloads.update(d => ({
                     ...d,
@@ -466,103 +314,7 @@ export class SettingsPage implements OnInit {
                 [taskId]: { ...d[taskId], status: 'failure' }
             }));
         } finally {
-            input.value = ''; // Reset input
-        }
-    }
-
-    async handleImportModel() {
-        if (!this.selectedImportFile() || !this.importModelName()) return;
-
-        const modelName = this.importModelName();
-        const filename = this.selectedImportFile();
-
-        await this.importSingleModel(filename, modelName, true);
-
-        this.activeTab.set('models'); // Switch tab after single import
-    }
-
-    async handleBatchImport() {
-        const files = this.importFiles();
-        if (files.length === 0) return;
-
-        // Filter for non-imported files
-        const filesToImport = files.filter(f => this.getImportStatus(f).class !== 'text-success');
-
-        if (filesToImport.length === 0) {
-            this.toastr.info('All files are already imported.');
-            return;
-        }
-
-        if (!confirm(`Batch import ${filesToImport.length} models? This may take a while.`)) return;
-
-        this.toastr.info(`Starting batch import of ${filesToImport.length} files...`, 'Batch Started');
-
-        for (const file of filesToImport) {
-            // Auto-generate name
-            const modelName = file.replace(/\.gguf$/i, '').toLowerCase();
-
-            // Import without switching tabs or showing individual success toasts for every single one (maybe just status updates)
-            await this.importSingleModel(file, modelName, false);
-
-            // Small delay to allow UI to breathe
-            await new Promise(r => setTimeout(r, 1000));
-        }
-
-        this.toastr.success('Batch import completed!', 'Done');
-        await this.settingsService.loadModels();
-    }
-
-    private async importSingleModel(filename: string, modelName: string, switchTabs: boolean) {
-        const taskId = `import-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-        // Optimistic UI
-        this.activeDownloads.update(d => ({
-            ...d,
-            [taskId]: {
-                task_id: taskId,
-                model: modelName,
-                status: 'importing',
-                progress: 0,
-                is_import: true
-            }
-        }));
-
-        if (switchTabs) {
-            this.toastr.info(`Importing ${modelName}...`, 'Import Started');
-        }
-
-        try {
-            await this.settingsService.importModel(filename, modelName);
-
-            // Update to success
-            this.activeDownloads.update(d => ({
-                ...d,
-                [taskId]: { ...d[taskId], status: 'success', progress: 100, dismissScheduled: true }
-            }));
-
-            if (switchTabs) {
-                this.toastr.success(`Successfully imported ${modelName}`, 'Import Complete');
-                this.importModelName.set('');
-                await this.settingsService.loadModels();
-            }
-
-            // Clean up task after delay
-            setTimeout(() => {
-                this.activeDownloads.update(d => {
-                    const next = { ...d };
-                    delete next[taskId];
-                    return next;
-                });
-            }, 5000);
-
-        } catch (err: any) {
-            console.error(err);
-            this.activeDownloads.update(d => ({
-                ...d,
-                [taskId]: { ...d[taskId], status: 'failure' }
-            }));
-            const msg = err.error?.error || 'Failed to import model';
-            this.toastr.error(`${modelName}: ${msg}`, 'Import Failed');
+            input.value = '';
         }
     }
 
@@ -571,129 +323,14 @@ export class SettingsPage implements OnInit {
 
         try {
             await this.settingsService.deletePull(taskId);
-            // Optimistic update
             const current = { ...this.activeDownloads() };
             delete current[taskId];
             this.activeDownloads.set(current);
         } catch (error) {
             console.error('Failed to delete task', error);
-            window.alert('Failed to delete task. Check console.');
+            this.toastr.error('Failed to delete task. Check console.');
         }
     }
-
-
-
-    // Ollama Service State
-    ollamaStatus = signal<{ status: string; id?: string }>({ status: 'unknown' });
-    ollamaInstallProgress = signal<{ status: string; progress?: number; message?: string } | null>(null);
-
-    async checkOllamaStatus() {
-        try {
-            const status = await this.settingsService.getOllamaStatus();
-            this.ollamaStatus.set(status);
-        } catch (e) {
-            console.error('Failed to check Ollama status', e);
-            this.ollamaStatus.set({ status: 'error' });
-        }
-    }
-
-    async handleStartOllamaService() {
-        try {
-            this.ollamaInstallProgress.set({ status: 'starting', message: 'Starting Ollama service...' });
-            const res = await this.settingsService.startOllamaService();
-            this.ollamaStatus.set(res);
-            this.ollamaInstallProgress.set(null);
-            setTimeout(() => this.loadAllData(), 2000); // Reload models after start
-        } catch (e) {
-            console.error(e);
-            this.ollamaInstallProgress.set({ status: 'error', message: 'Failed to start service' });
-        }
-    }
-
-    async handleInstallOllamaService() {
-        this.ollamaInstallProgress.set({ status: 'starting', message: 'Initializing download...' });
-
-        this.settingsService.installOllamaService().subscribe({
-            next: (event: any) => {
-                if (event.type === 3) { // HttpEventType.DownloadProgress is 3 (partial text)
-                    // Angular handles streaming text weirdly in default HttpClient events
-                    // We simplified backend to send NDJSON
-                    const partialText = event.partialText;
-                    if (partialText) {
-                        const lines = partialText.split('\n').filter((l: string) => l.trim());
-                        const lastLine = lines[lines.length - 1];
-                        try {
-                            const data = JSON.parse(lastLine);
-                            this.updateInstallProgress(data);
-                        } catch (e) { /* ignore parse error for partial chunks */ }
-                    }
-                }
-                else if (typeof event === 'string') {
-                    // Sometimes it comes as string if we used certain responseType settings, 
-                    // but here we used observe: 'events'
-                }
-            },
-            complete: () => {
-                this.ollamaInstallProgress.set(null);
-                this.checkOllamaStatus();
-            },
-            error: (err) => {
-                this.ollamaInstallProgress.set({ status: 'error', message: 'Installation failed' });
-                console.error(err);
-            }
-        });
-    }
-
-    updateInstallProgress(data: any) {
-        if (data.status) {
-            this.ollamaInstallProgress.set({
-                status: 'downloading',
-                message: data.status,
-                progress: data.progressDetail?.current ? (data.progressDetail.current / data.progressDetail.total * 100) : 0
-            });
-        }
-    }
-
-    // Prompts
-    openPromptModal(prompt?: SystemPrompt) {
-        if (prompt) {
-            this.editingPromptId.set(prompt.id);
-            this.promptForm.set({ title: prompt.title, content: prompt.content });
-        } else {
-            this.editingPromptId.set(null);
-            this.promptForm.set({ title: '', content: '' });
-        }
-        this.isPromptModalOpen.set(true);
-    }
-
-    closePromptModal() {
-        this.isPromptModalOpen.set(false);
-    }
-
-    async handleSavePrompt() {
-        const { title, content } = this.promptForm();
-        if (!title || !content) return;
-
-        if (this.editingPromptId()) {
-            await this.settingsService.updateSystemPrompt(this.editingPromptId()!, { title, content });
-        } else {
-            await this.settingsService.createSystemPrompt(title, content);
-        }
-        this.closePromptModal();
-    }
-
-    async handleDeletePrompt(id: string) {
-        if (!confirm('Delete this prompt?')) return;
-        await this.settingsService.deleteSystemPrompt(id);
-    }
-
-    // GGUF Direct Download
-    // GGUF Direct Download
-    isGgufModalOpen = signal<boolean>(false);
-    ggufFiles = signal<{ filename: string, size_mb: number, quantization: string }[]>([]);
-    loadingGgufFiles = signal<boolean>(false);
-    selectedRepoId = signal<string | null>(null);
-    hardwareInfo = signal<{ ram_available: number, vram_available: number, gpu_name: string | null } | null>(null);
 
     async openGgufModal(repoId: string) {
         this.selectedRepoId.set(repoId);
@@ -726,8 +363,6 @@ export class SettingsPage implements OnInit {
         const repo = this.selectedRepoId();
         if (!repo) return;
 
-        // Construct a friendly name: "qwen2.5-7b-instruct-q4"
-        // Simple heuristic: repo name + quantization
         const shortName = repo.split('/').pop()?.toLowerCase() || 'model';
         const modelName = `${shortName}-${file.quantization.toLowerCase()}`;
 
@@ -737,8 +372,6 @@ export class SettingsPage implements OnInit {
             await this.settingsService.pullModelGguf(repo, file.filename, modelName);
             this.toastr.success(`Download started for ${modelName}`, 'Download Queued');
             this.closeGgufModal();
-            // Switch to models tab to see progress? Or active downloads?
-            // Actually stay here is fine.
         } catch (error) {
             this.toastr.error('Failed to start download');
         }

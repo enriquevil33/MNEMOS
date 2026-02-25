@@ -1,0 +1,65 @@
+<div class="space-y-6 anime-fade-in">
+    <!-- Hardware Info -->
+    <div class="bg-panel border border-divider rounded-xl p-4 sm:p-6">
+        <h2 class="text-lg font-semibold mb-4">System Resources</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="bg-input rounded-lg p-4 col-span-3">
+                <div class="text-xs text-secondary mb-1">Models Installed</div>
+                <div class="text-2xl font-bold text-accent">{{ models().length }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Model -->
+    <div class="bg-accent-subtle border border-accent rounded-xl p-4">
+        <div class="flex items-center gap-2 text-accent">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span class="text-sm font-medium">Active Model: <strong>{{
+                    currentModel() || 'None' }}</strong></span>
+        </div>
+    </div>
+
+    <!-- Models List -->
+    <div class="bg-panel border border-divider rounded-xl overflow-hidden">
+        <div class="p-4 sm:p-6 border-b border-divider">
+            <h2 class="text-lg font-semibold">Your Models</h2>
+        </div>
+        <div class="divide-y divide-divider">
+            @for (model of models(); track model.filename) {
+            <div class="p-4 sm:p-6 hover:bg-hover transition-colors">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-2">
+                            <input type="radio" name="model-select" [checked]="currentModel() === model.filename"
+                                (change)="handleSetCurrentModel(model.filename)" class="radio radio-sm radio-accent">
+                            <h3 class="font-medium">
+                                {{ model.filename }}
+                            </h3>
+                            @if (currentModel() === model.filename) {
+                            <span class="badge badge-success badge-sm">Active</span>
+                            }
+                        </div>
+                        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-secondary">
+                            <span class="flex items-center gap-1" title="Model Size">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                                {{ model.size_mb }} MB
+                            </span>
+                            <span class="badge badge-sm badge-ghost">GGUF</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            }
+            @if (!models().length) {
+            <div class="p-8 text-center text-secondary">
+                No .gguf models found in the models/ folder. Go to "Discover Models" or "Manage Models" to add one.
+            </div>
+            }
+        </div>
+    </div>
+</div>

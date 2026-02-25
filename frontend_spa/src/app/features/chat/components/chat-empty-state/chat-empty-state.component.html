@@ -1,0 +1,41 @@
+<div class="flex flex-col items-center justify-center pt-md-10 pt-sm-3 text-center">
+    <!-- Video Logo with Text Overlay -->
+    <div class="relative w-full max-w-md sm:max-w-lg mb-4 flex items-center justify-center" style="aspect-ratio: 16/9;">
+        <h1 class="relative z-10 text-4xl sm:text-5xl font-bold text-primary font-brand drop-shadow-lg">
+            MNEMOS
+            <br>
+        </h1>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">
+        <button (click)="modalService.openUpload()"
+            class="p-4 bg-panel border border-divider rounded-xl hover:bg-hover transition-all text-left group">
+            <div class="flex items-start gap-3">
+                <div class="p-2 bg-accent-subtle rounded-lg group-hover:scale-110 transition-transform">
+                    <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-primary mb-1">Upload Documents</h3>
+                    <p class="text-xs text-secondary">Add PDFs, videos, or YouTube links</p>
+                </div>
+            </div>
+        </button>
+        <button (click)="openLlmModal.emit()"
+            class="p-4 bg-panel border border-divider rounded-xl hover:bg-hover transition-all text-left group">
+            <div class="flex items-start gap-3">
+                <div class="p-2 bg-accent-subtle rounded-lg group-hover:scale-110 transition-transform">
+                    <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-primary mb-1">Select Model</h3>
+                    <p class="text-xs text-secondary">Choose the best model for your task</p>
+                </div>
+            </div>
+        </button>
+    </div>
+</div>

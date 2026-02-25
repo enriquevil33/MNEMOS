@@ -24,7 +24,11 @@ timeout /t 15 /nobreak >nul
 
 echo Starting Angular dev server in new window...
 cd frontend_spa
-start "" cmd /c "ng serve -o --port 5200"
+if not exist node_modules (
+    echo Installing frontend dependencies...
+    call npm install
+)
+start "Angular Dev Server" cmd /k "npx ng serve -o --port 5200"
 cd ..
 
 echo Showing backend logs (Ctrl+C to stop)...

@@ -1,0 +1,153 @@
+@if (settingsService.chatPreferences()) {
+<div class="space-y-6 anime-fade-in">
+
+    <!-- Voice Overview / Enable -->
+    <div class="bg-panel border border-divider rounded-xl p-4 sm:p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h2 class="text-lg font-semibold">Voice Conversations</h2>
+                <p class="text-xs text-secondary mt-1">Enable spoken responses from the assistant.</p>
+            </div>
+            <input type="checkbox" [(ngModel)]="settingsService.chatPreferences()!.tts_enabled"
+                class="toggle toggle-accent" />
+        </div>
+    </div>
+
+    <!-- Voice Providers -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- STT -->
+        <div class="bg-panel border border-divider rounded-xl p-4 sm:p-6">
+            <h2 class="text-lg font-semibold mb-4">Speech-to-Text (Hearing)</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Provider</label>
+                    <select [(ngModel)]="settingsService.chatPreferences()!.stt_provider"
+                        class="w-full px-4 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
+                        <option value="browser">Browser Native (Free)</option>
+                        <option value="openai">OpenAI Whisper (API)</option>
+                        <option value="groq">Groq (Fast API)</option>
+                        <option value="deepgram">Deepgram (Free Tier)</option>
+                    </select>
+                    <p class="text-xs text-secondary mt-1">
+                        @if (settingsService.chatPreferences()!.stt_provider === 'browser') {
+                        Uses your browser's built-in speech recognition.
+                        } @else if (settingsService.chatPreferences()!.stt_provider === 'openai') {
+                        High accuracy, requires API Key.
+                        } @else if (settingsService.chatPreferences()!.stt_provider === 'groq') {
+                        Extremely fast, uses Groq Cloud.
+                        } @else if (settingsService.chatPreferences()!.stt_provider === 'deepgram') {
+                        Fast and accurate, requires Deepgram Key.
+                        }
+                    </p>
+                </div>
+
+                @if (settingsService.chatPreferences()!.stt_provider === 'openai') {
+                <div class="anime-fade-in">
+                    <label class="block text-sm font-medium mb-2">OpenAI Model</label>
+                    <input type="text" [(ngModel)]="settingsService.chatPreferences()!.openai_stt_model"
+                        class="w-full px-4 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent mb-2">
+
+                    <label class="block text-sm font-medium mb-2">API Key</label>
+                    <input type="password" [(ngModel)]="settingsService.chatPreferences()!.openai_api_key"
+                        placeholder="sk-..."
+                        class="w-full px-4 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
+                    <p class="text-xs text-secondary mt-1">Uses the same key as LLM if set there.</p>
+                </div>
+                }
+
+                @if (settingsService.chatPreferences()!.stt_provider === 'groq') {
+                <div class="anime-fade-in">
+                    <p class="text-sm text-secondary mb-2">
+                        Uses the <strong>Groq API Key</strong> set in Chat Settings > AI Provider.
+                    </p>
+                    <label class="block text-sm font-medium mb-2">Groq Key (Optional Override)</label>
+                    <input type="password" [(ngModel)]="settingsService.chatPreferences()!.groq_api_key"
+                        placeholder="gsk-..."
+                        class="w-full px-4 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
+                </div>
+                }
+
+                @if (settingsService.chatPreferences()!.stt_provider === 'deepgram') {
+                <div class="anime-fade-in">
+                    <label class="block text-sm font-medium mb-2">Deepgram API Key</label>
+                    <input type="password" [(ngModel)]="settingsService.chatPreferences()!.deepgram_api_key"
+                        placeholder="Token..."
+                        class="w-full px-4 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
+                </div>
+                }
+            </div>
+        </div>
+
+        <!-- TTS -->
+        <div class="bg-panel border border-divider rounded-xl p-4 sm:p-6">
+            <h2 class="text-lg font-semibold mb-4">Text-to-Speech (Speaking)</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Provider</label>
+                    <select [(ngModel)]="settingsService.chatPreferences()!.tts_provider"
+                        class="w-full px-4 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
+                        <option value="browser">Browser Native (Free)</option>
+                        <option value="openai">OpenAI TTS (API)</option>
+                        <option value="deepgram">Deepgram (Fast & Natural)</option>
+                    </select>
+                </div>
+
+                @if (settingsService.chatPreferences()!.tts_provider === 'openai') {
+                <div class="anime-fade-in">
+                    <label class="block text-sm font-medium mb-2">Voice</label>
+                    <select [(ngModel)]="settingsService.chatPreferences()!.tts_voice"
+                        class="w-full px-4 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent mb-2">
+                        <option value="alloy">Alloy</option>
+                        <option value="echo">Echo</option>
+                        <option value="fable">Fable</option>
+                        <option value="onyx">Onyx</option>
+                        <option value="nova">Nova</option>
+                        <option value="shimmer">Shimmer</option>
+                    </select>
+
+                    <label class="block text-sm font-medium mb-2">API Key</label>
+                    <input type="password" [(ngModel)]="settingsService.chatPreferences()!.openai_api_key"
+                        placeholder="sk-..."
+                        class="w-full px-4 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
+                </div>
+                }
+
+                @if (settingsService.chatPreferences()!.tts_provider === 'deepgram') {
+                <div class="anime-fade-in">
+                    <label class="block text-sm font-medium mb-2">Voice (Model)</label>
+                    <select [(ngModel)]="settingsService.chatPreferences()!.tts_voice"
+                        class="w-full px-4 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent mb-2">
+                        <option value="aura-asteria-en">Asteria (Female)</option>
+                        <option value="aura-luna-en">Luna (Female)</option>
+                        <option value="aura-stella-en">Stella (Female)</option>
+                        <option value="aura-athena-en">Athena (Female)</option>
+                        <option value="aura-hera-en">Hera (Female)</option>
+                        <option value="aura-orion-en">Orion (Male)</option>
+                        <option value="aura-arcas-en">Arcas (Male)</option>
+                        <option value="aura-perseus-en">Perseus (Male)</option>
+                        <option value="aura-angus-en">Angus (Male)</option>
+                        <option value="aura-orpheus-en">Orpheus (Male)</option>
+                        <option value="aura-helios-en">Helios (Male)</option>
+                        <option value="aura-zeus-en">Zeus (Male)</option>
+                        <option value="aura-2-estrella-es">Estrella (Mexican Spanish)</option>
+                    </select>
+
+                    <label class="block text-sm font-medium mb-2">Deepgram Key</label>
+                    <input type="password" [(ngModel)]="settingsService.chatPreferences()!.deepgram_api_key"
+                        placeholder="Token..."
+                        class="w-full px-4 py-2 bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
+                </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Button -->
+    <div class="flex justify-end">
+        <button (click)="handleSaveChatPreferences()" class="btn-primary px-6">
+            Save Settings
+        </button>
+    </div>
+</div>
+}
