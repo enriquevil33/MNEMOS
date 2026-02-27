@@ -5,38 +5,45 @@
 /* Container positioning */
 .toast-container {
     padding: 1rem !important;
+    border-radius: 30px !important;
 }
 
-/* Base Toast Style */
+/* Base Toast Style: Glassmorphism Monochromatic */
+#toast-container>div,
 .toast {
-    background-color: var(--color-panel) !important;
     color: var(--color-primary) !important;
-    box-shadow: var(--shadow-lg) !important;
-    border: 1px solid var(--color-divider) !important;
-    border-radius: 12px !important;
+    background-color: rgba(13, 13, 13, 0.4) !important;
+    /* Fallback */
+    background-color: color-mix(in srgb, var(--color-base) 40%, transparent) !important;
+    backdrop-filter: blur(20px) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
+    box-shadow: 0 0px 32px rgba(0, 0, 0, 0.5) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    border-radius: 30px !important;
     font-family: var(--font-ui) !important;
     opacity: 1 !important;
-    /* Force opacity to 1 (no transparency) */
-    backdrop-filter: blur(8px);
-    /* Optional glassmorphism */
     padding: 16px 20px 16px 50px !important;
-    /* Adjust padding for icon */
     width: 320px !important;
     margin-bottom: 12px !important;
+    transition: all 0.2s ease !important;
 }
 
+#toast-container>div:hover,
 .toast:hover {
-    box-shadow: var(--shadow-xl) !important;
-    border-color: var(--color-accent) !important;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.7) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* Success Toast */
+#toast-container>.toast-success,
 .toast-success {
     background-image: none !important;
-    /* Remove default icon */
-    border-left: 4px solid var(--color-success) !important;
+    /* Adding subtle green tint to base transparent dark color */
+    background-color: color-mix(in srgb, var(--color-success) 15%, color-mix(in srgb, var(--color-base) 80%, transparent)) !important;
+    border: 1px solid color-mix(in srgb, var(--color-success) 40%, transparent) !important;
 }
 
+#toast-container>.toast-success::before,
 .toast-success::before {
     content: '';
     position: absolute;
@@ -48,14 +55,19 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2310b981'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-size: contain;
+    opacity: 0.8;
 }
 
 /* Error Toast */
+#toast-container>.toast-error,
 .toast-error {
     background-image: none !important;
-    border-left: 4px solid var(--color-error) !important;
+    /* Adding subtle red tint to base transparent dark color */
+    background-color: color-mix(in srgb, var(--color-error) 15%, color-mix(in srgb, var(--color-base) 80%, transparent)) !important;
+    border: 1px solid color-mix(in srgb, var(--color-error) 40%, transparent) !important;
 }
 
+#toast-container>.toast-error::before,
 .toast-error::before {
     content: '';
     position: absolute;
@@ -67,14 +79,19 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ef4444'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-size: contain;
+    opacity: 0.8;
 }
 
 /* Info Toast */
+#toast-container>.toast-info,
 .toast-info {
     background-image: none !important;
-    border-left: 4px solid var(--color-accent) !important;
+    /* Adding subtle blue tint to base transparent dark color */
+    background-color: color-mix(in srgb, var(--color-accent) 20%, color-mix(in srgb, var(--color-base) 80%, transparent)) !important;
+    border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent) !important;
 }
 
+#toast-container>.toast-info::before,
 .toast-info::before {
     content: '';
     position: absolute;
@@ -83,14 +100,15 @@
     transform: translateY(-50%);
     width: 20px;
     height: 20px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233b82f6'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233985ff'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-size: contain;
+    opacity: 0.8;
 }
 
 /* Progress Bar */
 .toast-progress {
-    opacity: 0.2 !important;
+    opacity: 0.25 !important;
     background-color: currentColor !important;
     height: 2px !important;
     bottom: 0 !important;
@@ -99,12 +117,13 @@
 
 /* Title Message */
 .toast-title {
-    font-weight: 700 !important;
+    font-weight: 600 !important;
     font-size: 0.95rem !important;
     margin-bottom: 4px !important;
+    color: var(--color-primary) !important;
 }
 
 .toast-message {
     font-size: 0.875rem !important;
-    color: var(--color-primary) !important;
+    color: var(--color-secondary) !important;
 }

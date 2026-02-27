@@ -380,78 +380,22 @@ def reprocess_hypergraph_task(self, document_id: str):
 @celery_app.task(bind=True)
 def download_model_task(self, model_name):
     """
-    Celery task for downloading a model in the background.
+    DEPRECATED: Celery task for downloading Ollama models.
+    This is no longer used as the system now uses llama.cpp instead of Ollama.
+    Use download_gguf_task for GGUF model downloads instead.
     """
-    try:
-        base_url = settings.OLLAMA_BASE_URL.replace("/v1", "")
-        logger.info(f"Initiating background model download for: {model_name}")
-
-        # Track download progress
-        last_progress = None
-        
-        # Use simple json parsing to check for errors
-        import json
-
-        with requests.post(
-            f"{base_url}/api/pull",
-            json={"name": model_name},
-            stream=True,
-            timeout=1800  # 30 minutes timeout for the download
-        ) as r:
-            if r.status_code != 200:
-                logger.error(f"Ollama API returned non-200 status: {r.status_code} - {r.text}")
-                r.raise_for_status()
-
-            # Process the response and send updates as the download progresses
-            for line in r.iter_lines():
-                if line:
-                    try:
-                        progress_str = line.decode('utf-8')
-                        progress_data = json.loads(progress_str)
-                        
-                        # VERBOSE LOGGING:
-                        # Log specific milestones or errors to server console
-                        if 'error' in progress_data:
-                            error_msg = progress_data['error']
-                            logger.error(f"Ollama reported error during pull for {model_name}: {error_msg}")
-                            raise Exception(f"Ollama API Error: {error_msg}")
-                            
-                        status = progress_data.get('status', '')
-                        
-                        # Log unique statuses to show progress in server logs
-                        # Avoid logging every single percentage tick to keep logs readable but informative
-                        if 'completed' in status or 'pulling manifest' in status or 'verifying' in status:
-                             logger.info(f"[Pull {model_name}] {status}")
-                             
-                        # Update the task state with progress
-                        self.update_state(
-                            state='PROGRESS',
-                            meta={
-                                'status': 'downloading',
-                                'progress_line': progress_str,
-                                'model_name': model_name
-                            }
-                        )
-                        last_progress = progress_str
-                    except json.JSONDecodeError:
-                        logger.warning(f"Could not parse progress line as JSON: {line}")
-                    except Exception as e:
-                        # Re-raise explicit API errors
-                        if "Ollama API Error" in str(e):
-                            raise e
-                        logger.error(f"Error processing progress line: {e}")
-
-        logger.info(f"Model download completed successfully for {model_name}")
-        return {'status': 'success', 'model_name': model_name, 'last_progress': last_progress}
-
-    except Exception as e:
-        logger.error(f"TASK FAILED: Error downloading model {model_name}: {e}")
-        return {'status': 'error', 'model_name': model_name, 'error': str(e)}
+    logger.error(f"download_model_task called but Ollama is deprecated. Use download_gguf_task instead.")
+    return {
+        'status': 'error',
+        'model_name': model_name,
+        'error': 'Ollama model downloads are deprecated. Please use GGUF downloads for llama.cpp instead.'
+    }
 
 @celery_app.task(bind=True)
 def download_gguf_task(self, repo_id, filename, model_name):
     """
-    Download a GGUF file from HF and import it into Ollama.
+    Download a GGUF file from HF for llama.cpp.
+    Note: Ollama import functionality is deprecated. llama.cpp reads GGUF files directly from /models.
     """
     logger.info(f"Starting GGUF download: {repo_id}/{filename} as {model_name}")
     try:
@@ -470,49 +414,26 @@ def download_gguf_task(self, repo_id, filename, model_name):
                     }
                 )
 
-        # 1. Download
+        # Download GGUF file to models directory
         dest_path = HFDownloader.download_file(repo_id, filename, progress_callback)
         logger.info(f"Download complete: {dest_path}")
 
-        # 2. Import to Ollama
-        self.update_state(state='PROGRESS', meta={'status': 'importing', 'model_name': model_name})
-        
-        # Use Docker SDK to run CLI command directly in the Ollama container
-        try:
-            from app.utils.docker_helpers import get_ollama_container
-            container = get_ollama_container()
-            if not container:
-                raise Exception("Ollama container not found")
-        except Exception as docker_e:
-             raise Exception(f"Docker connection failed: {docker_e}")
+        # For llama.cpp: No import step needed. The server loads GGUF files directly from /models.
+        # Just verify the file exists and is readable
+        if not os.path.exists(dest_path):
+            raise Exception(f"Downloaded file not found at {dest_path}")
 
-        ollama_path = f"/root/.ollama/import/{filename}"
-        # Sanitize model name for filename
-        modelfile_name = f"Modelfile_{model_name.replace(':', '_').replace('/', '_')}"
-        modelfile_path = f"/root/.ollama/{modelfile_name}"
-        
-        logger.info(f"Creating Modelfile inside container: {modelfile_path}")
-        # Create Modelfile
-        exit_code, output = container.exec_run(f'sh -c "echo \'FROM {ollama_path}\' > {modelfile_path}"')
-        if exit_code != 0:
-            raise Exception(f"Failed to create Modelfile: {output.decode()}")
+        file_size = os.path.getsize(dest_path)
+        logger.info(f"Successfully downloaded {filename} ({file_size / (1024**3):.2f} GB)")
+        logger.info(f"Model ready for llama.cpp at: {dest_path}")
 
-        logger.info(f"Running ollama create {model_name}...")
-        
-        # Stream the CLI output
-        exec_stream = container.exec_run(f"ollama create {model_name} -f {modelfile_path}", stream=True)
-        
-        for chunk in exec_stream.output:
-            line = chunk.decode().strip()
-            if line:
-                logger.info(f"Ollama Import: {line}")
-                self.update_state(state='PROGRESS', meta={'status': f"importing: {line[:50]}", 'model_name': model_name})
-                
-        # Cleanup Modelfile
-        container.exec_run(f"rm {modelfile_path}")
-
-        logger.info(f"Successfully imported {model_name}")
-        return {'status': 'success', 'model_name': model_name}
+        return {
+            'status': 'success',
+            'model_name': model_name,
+            'path': dest_path,
+            'filename': filename,
+            'size_gb': round(file_size / (1024**3), 2)
+        }
 
     except Exception as e:
         logger.error(f"GGUF Task failed: {e}")

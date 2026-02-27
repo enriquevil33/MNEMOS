@@ -50,14 +50,14 @@
     </div>
 
     <!-- Content -->
-    <div class="flex-1 overflow-y-auto p-2">
+    <div class="flex-1 overflow-y-auto px-2 pb-2">
         @if (activeTab() === 'chats') {
         <!-- Collection Selector -->
-        <div class="mb-3 px-2">
+        <div class="mb-3 px-2 pt-2">
             <label class="block text-xs font-medium text-secondary mb-2">Context Collection</label>
             <select [(ngModel)]="selectedCollectionId" (change)="handleSelectCollection($any($event.target).value)"
                 class="w-full px-2 py-1.5 text-xs bg-input border border-divider rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
-                <option [ngValue]="null">All Documents</option>
+                <option [ngValue]="null">None</option>
                 @for (col of collections(); track col.id) {
                 <option [value]="col.id">{{ col.name }}</option>
                 }
@@ -66,7 +66,8 @@
                 context</p>
         </div>
 
-        <div class="flex items-center justify-between px-2 mb-2 border-t border-divider pt-3">
+        <div
+            class="sticky top-0 z-10 bg-sidebar flex items-center justify-between px-2 mb-2 border-t border-divider pt-3 pb-2">
             <span class="text-xs font-medium text-secondary">Conversations</span>
             <button (click)="handleNewChat(); isSidebarOpen().set(false)"
                 class="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium text-base bg-primary hover:bg-primary/90 rounded-md transition-colors w-fit">
@@ -107,7 +108,7 @@
         }
         } @else {
         <!-- Documents List -->
-        <div class="mb-3 px-2">
+        <div class="mb-3 px-2 pt-2">
             <div class="flex items-center justify-between text-xs text-secondary mb-2">
                 <span>{{ documentsService.selectedCount() }} selected</span>
                 <button (click)="documentsService.clearSelection()" class="text-accent hover:underline">Clear

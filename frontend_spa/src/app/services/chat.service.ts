@@ -1,4 +1,4 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Injectable, signal, inject, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom, Subject, takeUntil } from 'rxjs';
 import { ApiEndpoints } from '@core/constants/api-endpoints';
@@ -18,6 +18,10 @@ export class ChatService {
   messages = signal<Message[]>([]);
   currentConversationId = signal<string | null>(null);
   isLoading = signal<boolean>(false);
+  isWaitingForResponse = computed(() => {
+    const msgs = this.messages();
+    return this.isLoading() && msgs.length > 0 && msgs[msgs.length - 1].role === 'user';
+  });
 
   // Cancellation
   private stop$ = new Subject<void>();
@@ -89,9 +93,9 @@ export class ChatService {
     // Add empty message first
     this.messages.update(msgs => [...msgs, assistantMessage]);
 
-    // Simulate streaming
-    const chunkSize = 15; // Slightly faster chunks for "smoother" feel
-    const delay = 5; // Low delay
+    // Simulate realistic LLM streaming (approx 40-50 tokens per second)
+    const chunkSize = 2; // Realistically small chunks like a real token
+    const delay = 10; // About 100 updates per second = 200 chars/sec
 
     for (let i = 0; i < content.length; i += chunkSize) {
       // Check for cancellation

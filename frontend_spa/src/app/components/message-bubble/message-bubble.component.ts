@@ -11,6 +11,7 @@ import { VoiceService } from '@services/voice.service';
 
 import { GraphVisualizerComponent } from '@shared/components/graph-visualizer/graph-visualizer.component';
 import { Router } from '@angular/router';
+import { ToastrService } from 'ngx-toastr';
 
 @Component({
   selector: 'app-message-bubble',
@@ -62,10 +63,12 @@ import { Router } from '@angular/router';
           }
         } @else {
           <!-- Helper Component for Markdown Rendering -->
-          <app-markdown-display 
-            [content]="message().content" 
-            (citationClick)="handleCitation($event)">
-          </app-markdown-display>
+          <div class="llm-stream-container" [class.is-generating]="message().status === 'generating'">
+             <app-markdown-display 
+               [content]="message().content" 
+               (citationClick)="handleCitation($event)">
+             </app-markdown-display>
+          </div>
 
           @if (message().search_queries && message().search_queries!.length > 0) {
             <div class="mt-4 pt-3 border-t border-divider">
@@ -171,6 +174,7 @@ export class MessageBubbleComponent {
   private modalService = inject(ModalService);
   private voiceService = inject(VoiceService);
   private router = inject(Router);
+  private toastr = inject(ToastrService);
 
   // State
   isEditing = signal(false);
@@ -197,7 +201,9 @@ export class MessageBubbleComponent {
   }
 
   copyMessage() {
-    navigator.clipboard.writeText(this.message().content);
+    navigator.clipboard.writeText(this.message().content).then(() => {
+      this.toastr.success('Text copied!');
+    });
   }
 
   openImage(index: number, images: string[] | undefined) {

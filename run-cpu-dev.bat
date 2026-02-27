@@ -1,5 +1,11 @@
 @echo off
 echo Starting MNEMOS in CPU Dev Mode (Hot Reload)...
+
+:: --- AUTO CLEANUP ORPHANED IMAGES ---
+echo Cleaning up orphaned images...
+docker image prune -f >nul 2>&1
+:: -------------------------------------
+
 echo Starting backend containers...
 docker-compose -f docker-compose.yml -f docker-compose.cpu.yml up --no-deps --build app worker llamacpp mcp db redis adminer -d
 

@@ -2,6 +2,13 @@
 echo Starting MNEMOS in Dev Mode (Hot Reload)...
 echo.
 
+:: --- AUTO CLEANUP ORPHANED IMAGES ---
+echo Cleaning up orphaned images...
+docker image prune -f >nul 2>&1
+echo Cleaning up old unused images (keeps running containers)...
+docker image prune -a -f --filter "until=168h" >nul 2>&1
+:: -------------------------------------
+
 :: --- SMART BUILD LOGIC ---
 echo Checking for dependency changes...
 powershell -Command "$last = Get-Item .last_build_dev -ErrorAction SilentlyContinue; $files = @('requirements.txt', 'Dockerfile', 'docker-compose.yml', 'docker-compose.dev.yml'); $newest = $files | ForEach-Object { Get-Item $_ -ErrorAction SilentlyContinue } | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if (-not $last -or ($newest.LastWriteTime -gt $last.LastWriteTime)) { exit 1 } else { exit 0 }"

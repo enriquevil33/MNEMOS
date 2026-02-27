@@ -30,12 +30,14 @@
     </div>
 
     <!-- Messages Area (Flex Grow + Scroll) -->
-    <div #scrollContainer class="flex-1 overflow-y-auto scroll-smooth w-full relative z-10">
-        <div class="w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 pb-20">
+    <div #scrollContainer class="flex-1 overflow-y-auto scroll-smooth w-full relative z-10 flex flex-col">
+        <div class="w-full max-w-4xl mx-auto px-4 sm:px-6 pt-6 flex-1 flex flex-col"
+            [class.pb-20]="chatService.messages().length > 0">
 
             <!-- Empty State -->
             @if (chatService.messages().length === 0) {
-            <app-chat-empty-state (openLlmModal)="isLlmModalOpen.set(true)"></app-chat-empty-state>
+            <app-chat-empty-state class="flex-1 flex flex-col"
+                (openLlmModal)="isLlmModalOpen.set(true)"></app-chat-empty-state>
             }
 
             <!-- Message List -->
@@ -47,7 +49,7 @@
             </div>
 
             <!-- Loading Indicator -->
-            @if (chatService.isLoading()) {
+            @if (chatService.isWaitingForResponse()) {
             <div class="flex justify-start pt-4 anime-fade-in">
                 <div class="typing-indicator">
                     <div class="typing-dot"></div>

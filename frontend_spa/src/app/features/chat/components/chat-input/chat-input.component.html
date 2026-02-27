@@ -20,9 +20,8 @@
     <!-- Input Area -->
     <div class="max-w-3xl mx-auto relative">
 
-        <!-- Floating Capsule -->
         <div
-            class="bg-panel/90 backdrop-blur-md border border-divider rounded-[2rem] shadow-2xl p-2 transition-all duration-300 ring-1 ring-white/10 relative">
+            class="bg-panel/90 backdrop-blur-md border border-divider rounded-[2rem] shadow-2xl p-2 transition-all duration-300 ring-1 ring-transparent hover:ring-gray-300 dark:hover:ring-white/40 relative">
 
             <!-- Image Previews (Inside Capsule) -->
             @if (selectedImages().length > 0) {
@@ -42,7 +41,7 @@
             </div>
             }
 
-            <div class="flex items-end gap-2 relative">
+            <div class="flex items-end gap-2 relative ">
 
                 <!-- PLUS Button (Menu Trigger) -->
                 <div class="relative">
@@ -58,7 +57,7 @@
                     <!-- Popover Menu -->
                     @if (isMenuOpen()) {
                     <div
-                        class="absolute bottom-full left-0 mb-3 w-56 bg-panel border border-divider rounded-2xl shadow-xl overflow-hidden anime-fade-in z-50 flex flex-col py-1">
+                        class="absolute bottom-full left-0 mb-3 w-56 bg-panel border border-divider rounded-2xl shadow-xl overflow-hidden anime-fade-in z-50 flex flex-col py-1 ">
 
                         <!-- Upload -->
                         <button (click)="triggerFileInput(); closeMenu()" [disabled]="!visionEnabled()"
@@ -137,7 +136,7 @@
                 </div>
 
                 <!-- Text Area Container -->
-                <div class="flex-1 flex flex-col justify-center min-h-[44px]">
+                <div class="flex-1 flex flex-col justify-center min-h-[44px] ">
 
                     <!-- Active Badges (Web Search / Documents) -->
                     @if (isWebSearchEnabled() || documentsService.selectedCount() > 0) {

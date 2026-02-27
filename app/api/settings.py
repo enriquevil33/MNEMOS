@@ -764,44 +764,42 @@ def upload_gguf():
 
 @bp.route('/import', methods=['POST'])
 def import_model():
-    """Import a GGUF model."""
+    """
+    Import a GGUF model for llama.cpp.
+    Note: For llama.cpp, models just need to exist in /models directory - no import step needed.
+    This endpoint now simply verifies the file exists and is valid.
+    """
     data = request.json
     filename = data.get('filename')
-    model_name = data.get('model_name') # User defined name
-    
+    model_name = data.get('model_name') # User defined name (for UI purposes)
+
     if not filename or not model_name:
         return jsonify({"error": "Filename and Model Name required"}), 400
 
     try:
-        # Use Docker SDK to run ollama create inside the container
-        from app.utils.docker_helpers import get_ollama_container
-        container = get_ollama_container()
-        if not container:
-             return jsonify({"error": "Ollama container not found"}), 500
-        
-        # 1. Write the Modelfile inside the container
-        # The file is at /root/.ollama/import/{filename} inside OLLAMA container.
-        modelfile_path = f"/root/.ollama/import/{filename}.Modelfile"
-        model_path = f"/root/.ollama/import/{filename}"
-        
-        # We use sh -c to echo the content to a file
-        cmd_write = f"sh -c \"echo 'FROM {model_path}' > '{modelfile_path}'\""
-        write_res = container.exec_run(cmd_write)
-        
-        if write_res.exit_code != 0:
-            return jsonify({"error": f"Failed to write Modelfile: {write_res.output.decode()}"}), 500
+        # For llama.cpp: Just verify the GGUF file exists in the models directory
+        models_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'models')
+        file_path = os.path.join(models_dir, filename)
 
-        # 2. Run ollama create
-        cmd_create = f"ollama create '{model_name}' -f '{modelfile_path}'"
-        
-        # Execute synchronously to avoid streaming format issues with frontend
-        # The frontend expects a single JSON response, not a stream of text/NDJSON
-        create_res = container.exec_run(cmd_create)
-        
-        if create_res.exit_code != 0:
-             return jsonify({"error": f"Failed to create model: {create_res.output.decode()}"}), 500
-                
-        return jsonify({"success": True, "details": create_res.output.decode()})
+        if not os.path.exists(file_path):
+            return jsonify({"error": f"GGUF file not found: {filename}"}), 404
+
+        if not filename.lower().endswith('.gguf'):
+            return jsonify({"error": "File must be a .gguf file"}), 400
+
+        # Get file info
+        file_size = os.path.getsize(file_path)
+        size_gb = round(file_size / (1024**3), 2)
+
+        # For llama.cpp, the model is ready to use immediately
+        # The server will load it when selected via the model selector
+        return jsonify({
+            "success": True,
+            "details": f"Model {filename} ({size_gb} GB) is ready for llama.cpp. Select it from the model list to use it.",
+            "filename": filename,
+            "size_gb": size_gb,
+            "path": f"/models/{filename}"
+        })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
