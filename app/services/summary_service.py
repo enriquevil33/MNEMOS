@@ -13,6 +13,43 @@ logger = logging.getLogger(__name__)
 
 class SummaryService:
     @staticmethod
+    def _sanitize_title(title: str, max_length: int = 480) -> str:
+        """
+        Sanitize and truncate section title intelligently.
+
+        Truncates at word boundaries when possible to maintain readability.
+        Leaves 20-char buffer from database limit (500) for safety.
+
+        Args:
+            title: Raw title from LLM
+            max_length: Maximum allowed length (default 480)
+
+        Returns:
+            Sanitized title that fits within database constraints
+        """
+        if not title:
+            return 'Untitled Section'
+
+        # Strip whitespace
+        title = title.strip()
+
+        # If within limit, return as-is
+        if len(title) <= max_length:
+            return title
+
+        # Log warning for monitoring
+        logger.warning(f"Title exceeds {max_length} chars (actual: {len(title)}), truncating")
+
+        # Truncate at word boundary
+        truncated = title[:max_length - 3]  # Leave room for ellipsis
+        last_space = truncated.rfind(' ')
+
+        if last_space > max_length * 0.8:  # Only use word boundary if it's not too far back
+            truncated = truncated[:last_space]
+
+        return truncated + '...'
+
+    @staticmethod
     def generate_summary(document_id: str):
         """
         Generates a summary using Parallel Map-Reduce pattern.
@@ -100,7 +137,7 @@ class SummaryService:
             embedder = EmbedderService()
             
             for section_data in merged_sections:
-                title = section_data.get('title', 'Untitled Section')
+                title = SummaryService._sanitize_title(section_data.get('title', 'Untitled Section'))
                 content = section_data.get('summary', '') 
                 if not content: content = f"Section: {title}"
                 
@@ -149,7 +186,7 @@ class SummaryService:
             prompt = f"""Analyze this document segment.
 Return a valid JSON object (no markdown):
 {{
-    "title": "A descriptive title for this segment (infer one if missing)",
+    "title": "A concise, descriptive title for this segment (max 100 chars, infer if missing)",
     "summary": "Concise summary of this segment.",
     "concepts": [
          {{ "name": "Concept Name", "relevance": 1-10 }}

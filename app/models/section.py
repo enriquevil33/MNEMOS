@@ -13,7 +13,7 @@ class DocumentSection(db.Model):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     document_id = Column(UUID(as_uuid=True), ForeignKey('documents.id', ondelete='CASCADE'), nullable=False)
     
-    title = Column(String(255))
+    title = Column(String(500))  # Increased from 255 to allow longer LLM-generated titles
     content = Column(Text) # The summary of the section
     start_page = Column(Integer)
     end_page = Column(Integer)
