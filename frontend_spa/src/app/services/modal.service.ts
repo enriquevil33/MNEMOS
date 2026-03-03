@@ -17,6 +17,17 @@ export class ModalService {
         this.isUploadOpen.set(false);
     }
 
+    // Processing Monitor Modal
+    isProcessingMonitorOpen = signal(false);
+
+    openProcessingMonitor() {
+        this.isProcessingMonitorOpen.set(true);
+    }
+
+    closeProcessingMonitor() {
+        this.isProcessingMonitorOpen.set(false);
+    }
+
     // PDF Viewer Modal
     isPdfViewerOpen = signal(false);
     pdfDocument = signal<Document | null>(null);

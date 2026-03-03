@@ -57,11 +57,10 @@
     </main>
 </div>
 
-<app-upload-modal></app-upload-modal>
-
-<!-- PDF Viewer Modal -->
+<!-- Modals -->
+<app-fullscreen-modal [isLoading]="isInitialLoading()"></app-fullscreen-modal>
 <app-pdf-viewer [theme]="themeService.theme()"></app-pdf-viewer>
-<!-- Youtube Viewer Modal -->
-<app-youtube-viewer></app-youtube-viewer>
-<!-- Video Player Modal -->
 <app-video-player></app-video-player>
+<app-youtube-viewer></app-youtube-viewer>
+<app-upload-modal></app-upload-modal>
+<app-processing-monitor-modal></app-processing-monitor-modal>

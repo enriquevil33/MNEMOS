@@ -17,6 +17,8 @@ export class DocumentsService {
     selectedCount = computed(() => this.documents().filter((d: Document) => d.selected).length);
     totalCount = computed(() => this.documents().length);
 
+    processingDocuments = computed(() => this.documents().filter((d: Document) => d.status === 'pending' || d.status === 'processing'));
+
     constructor() {
     }
 
@@ -35,6 +37,13 @@ export class DocumentsService {
             const docs = await firstValueFrom(this.getDocuments(collectionId));
             // Map backend fields to UI fields if necessary, or just use them
             this.documents.set(docs.map((d: Document) => ({ ...d, selected: false })));
+
+            // Resume polling for any documents still processing
+            docs.forEach((doc: Document) => {
+                if (doc.status === 'pending' || doc.status === 'processing') {
+                    this.startPolling(doc.id);
+                }
+            });
         } catch (error) {
             console.error('Failed to fetch documents', error);
         }
@@ -112,13 +121,13 @@ export class DocumentsService {
         // Poll every 2 seconds
         const subscription = interval(2000).subscribe(async () => {
             try {
-                const statusUpdate: { status: string, error?: string } = await firstValueFrom(
-                    this.http.get<{ status: string, error?: string }>(ApiEndpoints.DOCUMENT_STATUS(docId))
+                const statusUpdate: { status: string, progress?: number, error?: string } = await firstValueFrom(
+                    this.http.get<{ status: string, progress?: number, error?: string }>(ApiEndpoints.DOCUMENT_STATUS(docId))
                 );
 
                 // Update document in list
                 this.documents.update((docs: Document[]) =>
-                    docs.map((d: Document) => d.id === docId ? { ...d, status: statusUpdate.status as Document['status'], error_message: statusUpdate.error } : d)
+                    docs.map((d: Document) => d.id === docId ? { ...d, status: statusUpdate.status as Document['status'], progress: statusUpdate.progress, error_message: statusUpdate.error } : d)
                 );
 
                 // Stop polling if completed or failed

@@ -18,11 +18,12 @@ import { Document } from '@core/models';
 
 import { SidebarComponent } from '@components/sidebar/sidebar.component';
 import { UploadModalComponent } from '@components/modals/upload-modal/upload-modal.component';
+import { ProcessingMonitorModalComponent } from '@components/modals/processing-monitor-modal/processing-monitor-modal.component';
 
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [RouterOutlet, CommonModule, FullscreenModalComponent, PdfViewerComponent, YoutubeViewer, VideoPlayerComponent, SidebarComponent, UploadModalComponent],
+  imports: [RouterOutlet, CommonModule, FullscreenModalComponent, PdfViewerComponent, YoutubeViewer, VideoPlayerComponent, SidebarComponent, UploadModalComponent, ProcessingMonitorModalComponent],
   templateUrl: './main-layout.html',
   styleUrl: './main-layout.css'
 })

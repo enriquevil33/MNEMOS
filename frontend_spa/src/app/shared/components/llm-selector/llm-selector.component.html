@@ -7,10 +7,7 @@
     <select [ngModel]="selectedProvider()" (ngModelChange)="updateProvider($event)"
       class="select select-bordered w-full bg-input border-divider text-primary focus:border-accent focus:ring-1 focus:ring-accent transition-all">
       <option value="llamacpp">llama.cpp (Local)</option>
-      <option value="openai">OpenAI</option>
-      <option value="anthropic">Anthropic</option>
       <option value="groq">Groq</option>
-      <option value="lm_studio">LM Studio</option>
       <option value="custom">Custom Connections</option>
     </select>
   </div>
@@ -115,7 +112,7 @@
 
   <!-- Provider Specific Config (Legacy logic for non-custom) -->
 
-  <!-- API Key (OpenAI, Anthropic, Groq) -->
+  <!-- API Key (Groq) -->
   @if (isApiKeyRequired()) {
   <div class="form-control anime-fade-in">
     <label class="label">
@@ -132,18 +129,6 @@
           class="link link-accent">console.groq.com</a></span>
     </div>
     }
-  </div>
-  }
-
-  <!-- Base URL (LM Studio) -->
-  @if (selectedProvider() === 'lm_studio') {
-  <div class="form-control anime-fade-in">
-    <label class="label">
-      <span class="label-text font-medium text-secondary">Base URL</span>
-    </label>
-    <input type="text" [ngModel]="baseUrl()" (ngModelChange)="baseUrl.set($event)"
-      placeholder="http://localhost:1234/v1"
-      class="input input-bordered w-full bg-input border-divider text-primary focus:border-accent focus:ring-1 focus:ring-accent transition-all">
   </div>
   }
 
@@ -168,18 +153,6 @@
       <span class="label-text-alt text-error">No models found. Check connection/key.</span>
     </div>
     }
-  </div>
-  }
-
-  <!-- Manual Model ID (LM Studio Only) -->
-  @if (selectedProvider() === 'lm_studio') {
-  <div class="form-control anime-fade-in">
-    <label class="label">
-      <span class="label-text font-medium text-secondary">Model ID</span>
-    </label>
-    <input type="text" [ngModel]="customModelId()" (ngModelChange)="customModelId.set($event)"
-      placeholder="e.g., local-model"
-      class="input input-bordered w-full bg-input border-divider text-primary focus:border-accent focus:ring-1 focus:ring-accent transition-all">
   </div>
   }
 </div>

@@ -9,6 +9,7 @@ import { ConversationsService } from '@services/conversations.service';
 import { ChatService } from '@services/chat.service';
 import { CollectionService } from '@services/collection.service';
 import { Document } from '@core/models';
+import { ThemeService } from '../../services/theme.service';
 
 @Component({
     selector: 'app-sidebar',
@@ -25,6 +26,7 @@ export class SidebarComponent implements OnInit {
 
     router = inject(Router);
     modalService = inject(ModalService);
+    themeService = inject(ThemeService);
     documentsService = inject(DocumentsService);
     conversationsService = inject(ConversationsService);
     chatService = inject(ChatService);

@@ -1,0 +1,67 @@
+<div class="modal modal-bottom sm:modal-middle" [class.modal-open]="modalService.isProcessingMonitorOpen()">
+    <div class="modal-box glass-panel relative p-0 overflow-hidden border border-white/5 flex flex-col max-h-[90vh]">
+        <!-- Header -->
+        <div class="p-6 border-b border-white/5 bg-base-200/50">
+            <h3 class="font-bold text-lg text-primary flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor" class="w-6 h-6 animate-pulse text-accent">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+                Processing Monitor
+            </h3>
+            <p class="text-xs text-secondary mt-1">Real-time status of document background tasks</p>
+        </div>
+
+        <button
+            class="btn btn-sm btn-circle btn-ghost absolute right-4 top-4 text-secondary hover:text-primary hover:bg-white/10 z-10 bg-base-300/50"
+            (click)="modalService.closeProcessingMonitor()">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+
+        <!-- Body -->
+        <div class="p-6 overflow-y-auto space-y-4">
+
+            <div *ngIf="processingDocuments().length === 0" class="text-center py-8">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor" class="w-12 h-12 mx-auto text-secondary/30 mb-4">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+                <h4 class="text-primary font-medium">All Caught Up!</h4>
+                <p class="text-sm text-secondary">There are no documents currently being processed.</p>
+            </div>
+
+            <!-- List of processing tasks -->
+            <div *ngFor="let doc of processingDocuments()"
+                class="bg-base-200/30 rounded-lg p-4 border border-white/5 transition-all">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-primary truncate max-w-[70%]"
+                        [title]="doc.original_filename || doc.filename">
+                        {{ doc.original_filename || doc.filename }}
+                    </span>
+                    <span
+                        class="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-medium uppercase tracking-wider">
+                        {{ doc.status }}
+                    </span>
+                </div>
+
+                <div class="mt-3">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-secondary animate-pulse">{{ getProcessText(doc.progress) }}</span>
+                        <span class="font-mono text-primary">{{ doc.progress || 0 }}%</span>
+                    </div>
+                    <div class="w-full bg-base-300 rounded-full h-1.5 overflow-hidden border border-white/5">
+                        <div class="bg-gradient-to-r from-primary to-accent h-1.5 rounded-full transition-all duration-300 ease-out"
+                            [style.width]="getProgressWidth(doc.progress)"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    <div class="modal-backdrop bg-black/60 backdrop-blur-sm" (click)="modalService.closeProcessingMonitor()"></div>
+</div>

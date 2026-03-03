@@ -158,6 +158,12 @@ export class UploadModalComponent {
             setTimeout(() => {
                 this.isUploading.set(false);
                 this.modalService.closeUpload();
+
+                // Open processing monitor if any success
+                if (successCount > 0) {
+                    this.modalService.openProcessingMonitor();
+                }
+
                 this.uploadProgress.set(0);
                 this.selectedFiles.set([]);
                 this.youtubeUrls.set([]);

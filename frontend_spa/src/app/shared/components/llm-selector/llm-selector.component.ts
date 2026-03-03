@@ -55,19 +55,6 @@ export class LlmSelectorComponent {
   fetchedGroqModels = signal<any[]>([]);
   fetchedLlamacppModels = signal<any[]>([]);
 
-  // Hardcoded Model Lists (unchanged)
-  readonly openaiModels = [
-    { name: 'gpt-4o', vision: true },
-    { name: 'gpt-4o-mini', vision: true },
-    { name: 'gpt-4.5-preview', vision: true },
-    { name: 'o1-preview', vision: false },
-    { name: 'o1-mini', vision: false }
-  ];
-  readonly anthropicModels = [
-    { name: 'claude-3-5-sonnet-latest', vision: true },
-    { name: 'claude-3-5-haiku-latest', vision: true },
-    { name: 'claude-3-opus-latest', vision: true }
-  ];
   readonly groqModels = [
     { name: 'deepseek-r1-distill-llama-70b', vision: false },
     { name: 'gemma-7b-it', vision: false },
@@ -134,17 +121,10 @@ export class LlmSelectorComponent {
     this.selectedModel.set(prefs.selected_llm_model || '');
 
     switch (provider) {
-      case 'openai':
-        this.apiKey.set(prefs.openai_api_key || '');
-        break;
-      case 'anthropic':
-        this.apiKey.set(prefs.anthropic_api_key || '');
-        break;
       case 'groq':
         this.apiKey.set(prefs.groq_api_key || '');
         if (prefs.groq_api_key) this.loadGroqModels(prefs.groq_api_key);
         break;
-      case 'lm_studio':
       case 'custom':
       case 'llamacpp':
         this.baseUrl.set(prefs.local_llm_base_url || '');
@@ -154,18 +134,12 @@ export class LlmSelectorComponent {
   }
 
   // Computed
-  isApiKeyRequired = computed(() => ['openai', 'anthropic', 'groq'].includes(this.selectedProvider()));
-  isManualModelInput = computed(() => ['lm_studio'].includes(this.selectedProvider()));
+  isApiKeyRequired = computed(() => ['groq'].includes(this.selectedProvider()));
+  isManualModelInput = computed(() => false);
 
   currentModels = computed(() => {
     let models: any[] = [];
     switch (this.selectedProvider()) {
-      case 'openai':
-        models = this.openaiModels;
-        break;
-      case 'anthropic':
-        models = this.anthropicModels;
-        break;
       case 'groq':
         models = this.fetchedGroqModels().length > 0 ? this.fetchedGroqModels() : this.groqModels;
         break;
@@ -348,11 +322,9 @@ export class LlmSelectorComponent {
       update.active_connection_id = null; // Or handle this in service/backend? Backend handles override
     }
 
-    if (provider === 'openai') update.openai_api_key = this.apiKey();
-    if (provider === 'anthropic') update.anthropic_api_key = this.apiKey();
     if (provider === 'groq') update.groq_api_key = this.apiKey();
 
-    if (['lm_studio', 'llamacpp'].includes(provider)) {
+    if (provider === 'llamacpp') {
       update.local_llm_base_url = this.baseUrl();
     }
 
