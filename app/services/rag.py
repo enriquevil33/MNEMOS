@@ -183,7 +183,12 @@ Output ONLY the queries, one per line. Do not include numbering or bullets."""
         query_embedding = self.embedder.embed(query)
         pg_lang = self._detect_query_language(query)
 
-        base_filter = Chunk.document_id.in_(document_ids) if document_ids else None
+        # Convert document_ids strings to UUID objects for proper filtering
+        base_filter = None
+        if document_ids:
+            from uuid import UUID
+            uuid_list = [UUID(doc_id) if isinstance(doc_id, str) else doc_id for doc_id in document_ids]
+            base_filter = Chunk.document_id.in_(uuid_list)
 
         # --- Pass 1: Vector search ---
         similarity = 1 - Chunk.embedding.cosine_distance(query_embedding)

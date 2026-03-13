@@ -86,6 +86,12 @@ class Settings(BaseSettings):
     TRANSCRIPTION_FOLDER: str = os.path.join(UPLOAD_FOLDER, 'transcriptions')
     ARCHIVE_FOLDER: str = os.path.join(os.getcwd(), 'archive') if os.name == 'nt' else "/app/archive"
     MAX_CONTENT_LENGTH: int = 50 * 1024 * 1024 * 1024  # 50GB
+
+    # VideoMix Settings
+    VIDEOMIX_MAX_SEGMENTS: int = 50  # Maximum segments per video
+    VIDEOMIX_DEFAULT_RESOLUTION: str = '1080p'
+    VIDEOMIX_RENDER_TIMEOUT: int = 3600  # 1 hour timeout for rendering tasks
+
     
     class Config:
         env_file = ".env"

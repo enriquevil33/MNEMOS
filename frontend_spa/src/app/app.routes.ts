@@ -38,6 +38,14 @@ export const routes: Routes = [
             {
                 path: AppRoutes.WIKI + '/:name',
                 loadComponent: () => import('./features/wiki/wiki-article.component').then(m => m.WikiArticleComponent)
+            },
+            {
+                path: AppRoutes.VIDEOMIX,
+                loadComponent: () => import('./features/videomix/pages/videomix-page.component').then(m => m.VideoMixPageComponent)
+            },
+            {
+                path: AppRoutes.VIDEOMIX + '/:id',
+                loadComponent: () => import('./features/videomix/pages/videomix-detail-page.component').then(m => m.VideoMixDetailPageComponent)
             }
         ]
     }

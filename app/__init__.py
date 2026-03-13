@@ -52,6 +52,8 @@ def create_app():
 
     from app.api.wiki import bp as wiki_bp
     app.register_blueprint(wiki_bp)
+    from app.api.videomix import bp as videomix_bp
+    app.register_blueprint(videomix_bp)
     
     from sqlalchemy import text
     from sqlalchemy.exc import SQLAlchemyError
@@ -78,5 +80,15 @@ def create_app():
         except SQLAlchemyError as e:
             print(f"Database initialization note: {e}")
             pass
+            pass
+
+        # Create VideoMix output directory
+        try:
+            import os
+            videomix_output_dir = os.path.join(settings.UPLOAD_FOLDER, 'videomix_output')
+            os.makedirs(videomix_output_dir, exist_ok=True)
+            print(f"VideoMix output directory ready: {videomix_output_dir}")
+        except Exception as e:
+            print(f"Warning: Could not create VideoMix output directory: {e}")
 
     return app

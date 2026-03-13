@@ -5,6 +5,49 @@ from typing import Dict
 from config.settings import settings
 
 class YouTubeService:
+    def download_video(self, url: str) -> Dict:
+        """
+        Download video from YouTube.
+        Returns dict with file_path and metadata.
+        """
+        output_filename = f"yt_{uuid4().hex}"
+        output_path = os.path.join(settings.UPLOAD_FOLDER, output_filename)
+
+        ydl_opts = {
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'outtmpl': output_path + '.%(ext)s',
+            'merge_output_format': 'mp4',
+            'quiet': True,
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            title = info.get('title', 'YouTube Video')
+            duration = info.get('duration', 0)
+            author = info.get('uploader') or info.get('channel') or 'Unknown'
+            description = info.get('description', '')
+
+        # yt-dlp appends extension to filename
+        final_path = output_path + ".mp4"
+        if not os.path.exists(final_path):
+            # Fallback check for other extensions
+            for ext in ['webm', 'mkv', 'avi']:
+                if os.path.exists(output_path + f".{ext}"):
+                    final_path = output_path + f".{ext}"
+                    break
+
+        if not os.path.exists(final_path):
+            raise FileNotFoundError("Could not locate downloaded YouTube video file")
+
+        return {
+            "file_path": final_path,
+            "filename": os.path.basename(final_path),
+            "title": title,
+            "duration": float(duration) if duration else 0.0,
+            "author": author,
+            "description": description
+        }
+
     def download_audio(self, url: str) -> Dict:
         """
         Download audio from YouTube video.

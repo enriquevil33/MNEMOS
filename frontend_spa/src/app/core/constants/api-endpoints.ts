@@ -56,4 +56,15 @@ export const ApiEndpoints = {
   WIKI_CONCEPTS: '/api/wiki/concepts',
   WIKI_ARTICLE: (name: string) => `/api/wiki/article/${encodeURIComponent(name)}`,
   WIKI_SEARCH: '/api/wiki/search',
+
+  // VideoMix
+  VIDEOMIX_PROJECTS: '/api/videomix/projects',
+  VIDEOMIX_PROJECT: (id: string) => `/api/videomix/projects/${id}`,
+  VIDEOMIX_PROJECT_DELETE: (id: string) => `/api/videomix/projects/${id}`,
+  VIDEOMIX_GENERATE_SCRIPT: (projectId: string) => `/api/videomix/projects/${projectId}/generate-script`,
+  VIDEOMIX_REFINE_SCRIPT: (projectId: string) => `/api/videomix/projects/${projectId}/refine-script`,
+  VIDEOMIX_RENDER_SCRIPT: (scriptId: string) => `/api/videomix/scripts/${scriptId}/render`,
+  VIDEOMIX_RENDER_JOB: (jobId: string) => `/api/videomix/render-jobs/${jobId}`,
+  VIDEOMIX_CANCEL_RENDER: (jobId: string) => `/api/videomix/render-jobs/${jobId}/cancel`,
+  VIDEOMIX_DOWNLOAD: (jobId: string) => `/api/videomix/render-jobs/${jobId}/download`,
 } as const;

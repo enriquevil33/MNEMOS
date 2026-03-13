@@ -6,5 +6,6 @@ export enum AppRoutes {
     COLLECTIONS = 'collections',
     REASONING = 'reasoning',
     WIKI = 'wiki',
+    VIDEOMIX = 'videoMix',
     ABOUT = 'about'
 }
