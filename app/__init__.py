@@ -12,6 +12,7 @@ def create_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = settings.DATABASE_URL
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SECRET_KEY"] = settings.SECRET_KEY
+    app.config["MAX_CONTENT_LENGTH"] = settings.MAX_CONTENT_LENGTH
     app.config.from_prefixed_env()
 
     # Initialize extensions
@@ -27,14 +28,32 @@ def create_app():
     from app.web import bp as web_bp
     from app.api.conversations import bp as conversations_bp
     from app.api.settings import bp as settings_bp
+    from app.api.connections import bp as connections_bp
     from app.api.ollama_manage import bp as ollama_manage_bp # Changed: Import ollama_manage_bp
+    from app.api.collections import bp as collections_bp
     
     app.register_blueprint(documents_bp)
+    app.register_blueprint(collections_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(web_bp)
     app.register_blueprint(conversations_bp)
     app.register_blueprint(settings_bp, url_prefix='/api/settings') # Changed: Added url_prefix
-    app.register_blueprint(ollama_manage_bp, url_prefix='/api/settings/ollama') # Changed: Register ollama_manage_bp
+    app.register_blueprint(connections_bp)
+    app.register_blueprint(ollama_manage_bp, url_prefix='/api/settings/ollama')
+    
+    from app.api.memory import bp as memory_bp
+    app.register_blueprint(memory_bp, url_prefix='/api/memory')
+
+    from app.api.voice import voice_bp
+    app.register_blueprint(voice_bp, url_prefix='/api/voice')
+
+    from app.api.reasoning import bp as reasoning_bp
+    app.register_blueprint(reasoning_bp)
+
+    from app.api.wiki import bp as wiki_bp
+    app.register_blueprint(wiki_bp)
+    from app.api.videomix import bp as videomix_bp
+    app.register_blueprint(videomix_bp)
     
     from sqlalchemy import text
     from sqlalchemy.exc import SQLAlchemyError
@@ -50,10 +69,26 @@ def create_app():
             pass
         
         try:
-            # This import is necessary for Alembic to detect models
+            # Import models so SQLAlchemy knows about them
             from app import models
+
+            # Create all tables based on the model definitions
+            # This is idempotent - it won't recreate existing tables
             db.create_all()
-        except SQLAlchemyError:
+            print("Database tables created successfully")
+
+        except SQLAlchemyError as e:
+            print(f"Database initialization note: {e}")
             pass
+            pass
+
+        # Create VideoMix output directory
+        try:
+            import os
+            videomix_output_dir = os.path.join(settings.UPLOAD_FOLDER, 'videomix_output')
+            os.makedirs(videomix_output_dir, exist_ok=True)
+            print(f"VideoMix output directory ready: {videomix_output_dir}")
+        except Exception as e:
+            print(f"Warning: Could not create VideoMix output directory: {e}")
 
     return app

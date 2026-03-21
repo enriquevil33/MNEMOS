@@ -1,19 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+@import './streaming-animations.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
 /* ============================================
    MNEMOS Modern UI - Professional Theme System
    Inspired by ChatGPT, Claude, DeepSeek
    ============================================ */
 
 /* Font Face */
+
 @font-face {
-    font-family: 'Space Grotesk';
-    src: url('/fonts/SpaceGrotesk-Regular.ttf') format('truetype');
-    font-weight: 400;
+    font-family: 'Bodoni Moda SC';
+    src: url('/fonts/BodoniModaSC.woff2') format('woff2');
+    font-weight: 400 900;
     font-style: normal;
+    font-optical-sizing: auto;
+    font-display: swap;
 }
+
 
 /* ============================================
    CSS VARIABLES - THEME SYSTEM
@@ -21,6 +27,11 @@
 
 [data-theme="mnemos-dark"],
 :root {
+    /* Fonts */
+    --font-brand: 'Bodoni Moda SC', serif;
+    --font-ui: Roboto, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
     /* Color Palette */
     --color-base: #0d0d0d;
     --color-base-subtle: #171717;
@@ -36,9 +47,9 @@
     --color-primary: #ffffff;
     --color-secondary: #a0a0a0;
 
-    --color-accent: #3b82f6;
+    --color-accent: #3985ff;
     --color-accent-content: #ffffff;
-    --color-accent-dark: #2563eb;
+    --color-accent-dark: #1a3571;
     --color-accent-subtle: rgba(59, 130, 246, 0.1);
 
     --color-success: #10b981;
@@ -66,9 +77,9 @@
     --color-primary: #000000;
     --color-secondary: #4a4a4a;
 
-    --color-accent: #3b82f6;
+    --color-accent: #92bcff;
     --color-accent-content: #ffffff;
-    --color-accent-dark: #2563eb;
+    --color-accent-dark: #224a9f;
     --color-accent-subtle: rgba(59, 130, 246, 0.1);
 
     --color-success: #10b981;
@@ -82,6 +93,12 @@
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
 }
 
+/* Brand utility — optical sizing for Bodoni Moda SC at display sizes */
+.font-brand {
+    font-family: var(--font-brand);
+    font-optical-sizing: auto;
+}
+
 /* ============================================
    BASE STYLES
    ============================================ */
@@ -93,7 +110,7 @@
 }
 
 body {
-    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+    font-family: var(--font-ui);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background-color: var(--color-base);
@@ -217,17 +234,347 @@ textarea {
     color: var(--color-primary);
 }
 
+/* Button Size Variants */
+.btn-xs {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    border-radius: 6px;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.875rem;
+    border-radius: 6px;
+}
+
+/* Button Shape Variants */
+.btn-circle {
+    border-radius: 50%;
+    padding: 8px;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Button Style Variants */
+.btn-ghost {
+    background-color: transparent;
+    color: var(--color-secondary);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-ghost:hover {
+    background-color: var(--color-hover);
+    color: var(--color-primary);
+}
+
+.btn-outline {
+    background-color: transparent;
+    color: var(--color-primary);
+    border: 1px solid var(--color-divider);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-outline:hover {
+    background-color: var(--color-hover);
+}
+
+.btn-outline.btn-error {
+    border-color: var(--color-error);
+    color: var(--color-error);
+}
+
+.btn-outline.btn-error:hover {
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* Base button class for consistent styling */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+    background-color: var(--color-input);
+    color: var(--color-primary);
+}
+
+.btn:hover {
+    background-color: var(--color-hover);
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn.btn-accent {
+    background-color: var(--color-accent);
+    color: white;
+}
+
+.btn.btn-accent:hover {
+    background-color: var(--color-accent-dark);
+}
+
+/* ============================================
+   FORM INPUT STYLES
+   ============================================ */
+
+.input,
+.select {
+    width: 100%;
+    padding: 8px 12px;
+    background-color: var(--color-input);
+    border: 1px solid var(--color-divider);
+    border-radius: 8px;
+    color: var(--color-primary);
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.input:focus,
+.select:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 2px rgba(57, 133, 255, 0.2);
+}
+
+.input::placeholder {
+    color: var(--color-secondary);
+}
+
+/* Input Size Variants */
+.input-xs {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+}
+
+.input-sm {
+    padding: 6px 10px;
+    font-size: 0.8125rem;
+}
+
+.select-sm {
+    padding: 6px 10px;
+    font-size: 0.8125rem;
+}
+
+/* Form Control & Label */
+.form-control {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+}
+
+.label-text {
+    font-size: 0.875rem;
+    color: var(--color-primary);
+}
+
+.label-text-alt {
+    font-size: 0.75rem;
+    color: var(--color-secondary);
+}
+
+/* Badge Style Variants for badges with neutral styling */
+.badge-neutral {
+    background-color: var(--color-input);
+    color: var(--color-primary);
+    border: 1px solid var(--color-divider);
+}
+
+/* Link styling */
+.link {
+    text-decoration: underline;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.link:hover {
+    color: var(--color-accent);
+}
+
+.link-accent {
+    color: var(--color-accent);
+}
+
+/* Radio button styling */
+.radio {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--color-divider);
+    border-radius: 50%;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.radio:checked {
+    border-color: var(--color-accent);
+}
+
+.radio:checked::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px;
+    height: 10px;
+    background-color: var(--color-accent);
+    border-radius: 50%;
+}
+
+.radio-sm {
+    width: 16px;
+    height: 16px;
+}
+
+.radio-sm:checked::after {
+    width: 8px;
+    height: 8px;
+}
+
+/* Range slider styling */
+.range {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background-color: var(--color-input);
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+.range::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: var(--color-accent);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.range::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+.range::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: var(--color-accent);
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.range::-moz-range-thumb:hover {
+    transform: scale(1.1);
+}
+
+.range-sm {
+    height: 4px;
+}
+
+.range-sm::-webkit-slider-thumb {
+    width: 14px;
+    height: 14px;
+}
+
+.range-sm::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+}
+
+/* Loading spinner */
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--color-divider);
+    border-top-color: var(--color-accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+.loading-lg {
+    width: 40px;
+    height: 40px;
+    border-width: 3px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 /* ============================================
    MODAL STYLES
    ============================================ */
 
 .modal {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease-in-out;
+
     background-color: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(4px);
 }
 
+.modal-open,
+.modal[open] {
+    pointer-events: auto;
+    opacity: 1;
+    visibility: visible;
+}
+
 .modal-box {
+    position: relative;
+    max-height: calc(100vh - 5em);
+    max-width: 32rem;
+    width: 91.666667%;
+    overflow-y: auto;
+    border-radius: 1rem;
     box-shadow: var(--shadow-xl);
+    pointer-events: auto;
 }
 
 /* ============================================
@@ -266,6 +613,32 @@ textarea {
     50% {
         opacity: 0.5;
     }
+}
+
+@keyframes pulse-subtle {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
+}
+
+.animate-pulse-subtle {
+    animation: pulse-subtle 3s ease-in-out infinite;
+}
+
+@keyframes hue-spin {
+    to {
+        filter: hue-rotate(360deg);
+    }
+}
+
+.hue-rotate {
+    animation: hue-spin 73s linear infinite;
 }
 
 .anime-fade-in {
@@ -372,6 +745,84 @@ textarea {
     color: var(--color-error);
 }
 
+/* Badge Size Variants */
+.badge-xs {
+    padding: 2px 6px;
+    font-size: 0.625rem;
+    border-radius: 8px;
+}
+
+.badge-sm {
+    padding: 3px 8px;
+    font-size: 0.6875rem;
+    border-radius: 10px;
+}
+
+/* Badge Style Variants */
+.badge-ghost {
+    background-color: transparent;
+    color: var(--color-secondary);
+    border: 1px solid var(--color-divider);
+}
+
+.badge-primary {
+    background-color: rgba(57, 133, 255, 0.1);
+    color: var(--color-accent);
+}
+
+.badge-accent {
+    background-color: rgba(57, 133, 255, 0.1);
+    color: var(--color-accent);
+}
+
+/* ============================================
+   TOGGLE SWITCH STYLES
+   ============================================ */
+
+.toggle {
+    appearance: none;
+    position: relative;
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
+    background-color: var(--color-input);
+    border: 2px solid var(--color-divider);
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.toggle:checked {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
+.toggle::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: white;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggle:checked::before {
+    transform: translateX(20px);
+}
+
+.toggle:hover:not(:disabled) {
+    border-color: var(--color-secondary);
+}
+
+.toggle:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* ============================================
    FOCUS STYLES
    ============================================ */
@@ -471,6 +922,23 @@ textarea:focus-visible {
     top: 0px;
     width: 3px;
     height: 7px;
+}
+
+.checkbox-sm {
+    width: 18px;
+    height: 18px;
+}
+
+.checkbox-sm:checked::after {
+    left: 5px;
+    top: 1px;
+    width: 4px;
+    height: 9px;
+}
+
+.checkbox-primary:checked {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
 }
 
 p {

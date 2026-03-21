@@ -1,5 +1,5 @@
 
-import { Component, computed, inject, effect } from '@angular/core';
+import { Component, computed, inject, effect, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NgxExtendedPdfViewerModule, NgxExtendedPdfViewerService } from 'ngx-extended-pdf-viewer';
 import { ModalService } from '@services/modal.service';
@@ -19,6 +19,9 @@ export class PdfViewerComponent {
     modalService = inject(ModalService);
     pdfService = inject(NgxExtendedPdfViewerService);
 
+    // Theme input
+    theme = input<'dark' | 'light'>('dark');
+
     // Computed
     isVisible = this.modalService.isPdfViewerOpen;
     currentDoc = this.modalService.pdfDocument;
@@ -31,7 +34,7 @@ export class PdfViewerComponent {
         const doc = this.currentDoc();
         if (!doc) return undefined;
         const src = ApiEndpoints.DOCUMENT_CONTENT(doc.id);
-        console.log('PDF Viewer Src:', src);
+
         return src;
     });
 
@@ -40,7 +43,7 @@ export class PdfViewerComponent {
     }
 
     onPdfLoaded(event: any) {
-        console.log('PDF Loaded successfully', event);
+
         const term = this.searchTerm();
         if (term) {
             // Delay slightly to ensure rendering

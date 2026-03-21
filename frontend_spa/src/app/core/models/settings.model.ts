@@ -11,6 +11,8 @@ export interface OllamaModel {
     parameter_size?: string;
     quantization_level?: string;
   };
+  vision?: boolean;
+  description?: string;
 }
 
 export interface ModelsResponse {
@@ -38,6 +40,58 @@ export interface ChatPreferences {
   selected_llm_model?: string;
   transcription_provider?: string;
   custom_api_key?: string;
+  memory_enabled?: boolean;
+  memory_provider?: string;
+  memory_llm_model?: string;
+  max_memories?: number;
+  active_connection_id?: string;
+  web_search_provider?: 'duckduckgo' | 'tavily' | 'brave';
+  tavily_api_key?: string;
+  brave_search_api_key?: string;
+  tts_provider?: string;
+  stt_provider?: string;
+  tts_voice?: string;
+  tts_enabled?: boolean;
+  openai_tts_model?: string;
+  openai_stt_model?: string;
+  deepgram_api_key?: string;
+  ollama_num_ctx?: number;
+  llm_max_tokens?: number;
+  llm_temperature?: number;
+  llm_top_p?: number;
+  llm_frequency_penalty?: number;
+  llm_presence_penalty?: number;
+  archive_enabled?: boolean;
+}
+
+export interface LLMConnection {
+  id: string;
+  name: string;
+  base_url: string;
+  api_key?: string | null;
+  default_model?: string;
+  models?: string[];
+  provider_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LLMConnectionsResponse {
+  connections: LLMConnection[];
+}
+
+export interface UserMemory {
+  id: string;
+  content: string;
+  created_at: string;
+}
+
+export interface MemoriesResponse {
+  memories: UserMemory[];
+  usage: {
+    current: number;
+    max: number;
+  };
 }
 
 export interface SystemPrompt {
@@ -54,7 +108,7 @@ export interface SystemPromptsResponse {
   prompts: SystemPrompt[];
 }
 
-export interface LibraryModel {
+export interface Model {
   name: string;
   full_name: string;
   ollama_name: string | null;
@@ -69,12 +123,13 @@ export interface LibraryModel {
   downloads: number;
   likes: number;
   updated_at: string;
-  hf_url?: string;
-  is_hf_only: boolean;
+  hf_url: string;
+  is_hf_only?: boolean;
+  vision?: boolean; // New
 }
 
 export interface LibrarySearchResponse {
-  models: LibraryModel[];
+  models: Model[];
   total: number;
   fallback?: boolean;
 }

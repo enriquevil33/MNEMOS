@@ -80,6 +80,15 @@ echo [OK] Podman installed and started.
 set ENGINE=podman
 
 
+
+:CREATE_VOLUME
+echo [*] Ensuring ollama_models volume exists...
+if "%ENGINE%"=="podman" (
+    podman volume create ollama_models >nul 2>&1
+) else (
+    docker volume create ollama_models >nul 2>&1
+)
+
 :GPU_CHECK
 echo.
 echo [*] Checking for GPU capabilities...
@@ -144,5 +153,11 @@ echo.
 echo ===================================================
 echo    Application is running in the background.
 echo    Access it at: http://localhost:5000
+echo    Database Viewer (Adminer): http://localhost:8080/?pgsql=db^&username=mnemos_user^&db=mnemos_db^&ns=public
+echo      System: PostgreSQL
+echo      Server: db
+echo      Username: mnemos_user
+echo      Password: mnemos_pass
+echo      Database: mnemos_db
 echo ===================================================
 pause

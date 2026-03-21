@@ -1,26 +1,39 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Injectable, signal, inject, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subject, takeUntil } from 'rxjs';
 import { ApiEndpoints } from '@core/constants/api-endpoints';
 import { ChatRequest, ChatResponse, Message } from '@core/models';
+import { SettingsService } from './settings.service';
+import { VoiceService } from './voice.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ChatService {
   private http = inject(HttpClient);
+  private settingsService = inject(SettingsService);
+  private voiceService = inject(VoiceService);
 
   // State
   messages = signal<Message[]>([]);
   currentConversationId = signal<string | null>(null);
   isLoading = signal<boolean>(false);
+  isWaitingForResponse = computed(() => {
+    const msgs = this.messages();
+    return this.isLoading() && msgs.length > 0 && msgs[msgs.length - 1].role === 'user';
+  });
 
-  async sendMessage(request: ChatRequest): Promise<ChatResponse> {
+  // Cancellation
+  private stop$ = new Subject<void>();
+
+  async sendMessage(request: ChatRequest): Promise<ChatResponse | null> {
     this.isLoading.set(true);
 
     try {
       const response = await firstValueFrom(
-        this.http.post<ChatResponse>(ApiEndpoints.CHAT, request)
+        this.http.post<ChatResponse>(ApiEndpoints.CHAT, request).pipe(
+          takeUntil(this.stop$)
+        )
       ) as ChatResponse;
 
       // Update current conversation ID
@@ -33,23 +46,32 @@ export class ChatService {
 
       return response;
     } catch (error) {
-      console.error('Failed to send message', error);
-      throw error;
+      if (this.isLoading()) {
+        console.error('Failed to send message', error);
+        throw error;
+      }
+      return null;
     } finally {
       this.isLoading.set(false);
     }
+  }
+
+  cancelGeneration() {
+    this.stop$.next();
+    this.isLoading.set(false);
   }
 
   loadMessages(messages: Message[]) {
     this.messages.set(messages);
   }
 
-  addUserMessage(content: string) {
+  addUserMessage(content: string, images?: string[]) {
     const userMessage: Message = {
       id: `temp-${Date.now()}`,
       conversation_id: this.currentConversationId() || '',
       role: 'user',
       content,
+      images,
       created_at: new Date().toISOString()
     };
     this.messages.update(msgs => [...msgs, userMessage]);
@@ -71,11 +93,14 @@ export class ChatService {
     // Add empty message first
     this.messages.update(msgs => [...msgs, assistantMessage]);
 
-    // Simulate streaming
-    const chunkSize = 15; // Slightly faster chunks for "smoother" feel
-    const delay = 5; // Low delay
+    // Simulate realistic LLM streaming (approx 40-50 tokens per second)
+    const chunkSize = 2; // Realistically small chunks like a real token
+    const delay = 10; // About 100 updates per second = 200 chars/sec
 
     for (let i = 0; i < content.length; i += chunkSize) {
+      // Check for cancellation
+      if (!this.isLoading()) break;
+
       const chunk = content.slice(i, i + chunkSize);
 
       this.messages.update(msgs =>
@@ -97,6 +122,12 @@ export class ChatService {
           : msg
       )
     );
+
+    // TTS
+    const prefs = this.settingsService.chatPreferences();
+    if (prefs?.tts_enabled && this.isLoading()) { // Only speak if not cancelled
+      this.voiceService.speak(content);
+    }
   }
 
   clearMessages() {

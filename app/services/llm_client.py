@@ -4,119 +4,340 @@ from config.settings import settings, LLMProvider
 from app.services.model_manager import model_manager
 from app.extensions import db
 from app.models.user_preferences import UserPreferences
+from app.models.llm_connection import LLMConnection
+
+import os
 
 class LLMClient:
-    def __init__(self):
-        # Default defaults
-        self.provider = settings.LLM_PROVIDER
-        openai_key = settings.OPENAI_API_KEY
-        anthropic_key = settings.ANTHROPIC_API_KEY
-        groq_key = settings.GROQ_API_KEY
-        local_base_url = settings.LOCAL_LLM_BASE_URL
-        local_model = settings.LOCAL_LLM_MODEL
+    def __init__(self, provider=None, api_key=None, base_url=None, model=None):
+        # 1. Determine Provider
+        # Priority: Argument > DB > Settings
         
-        # Try loading from DB
+        db_prefs = None
+        db_prefs = None
         try:
-            if db.session.registry.has():
-                prefs = db.session.query(UserPreferences).first()
-                if prefs:
-                    if prefs.llm_provider:
-                        self.provider = prefs.llm_provider
-                    if prefs.openai_api_key:
-                        openai_key = prefs.openai_api_key
-                    if prefs.anthropic_api_key:
-                        anthropic_key = prefs.anthropic_api_key
-                    if prefs.groq_api_key:
-                        groq_key = prefs.groq_api_key
-                    if prefs.local_llm_base_url:
-                        local_base_url = prefs.local_llm_base_url
-                    # Note: Local Model Name is usually handled by ModelManager selection, 
-                    # but we keep a default here just in case.
+            # Just query directly. Flask-SQLAlchemy handles session creation if App Context is active.
+            db_prefs = db.session.query(UserPreferences).first()
+            if db_prefs:
+                print(f"DEBUG: Found UserPreferences in DB. Provider: {db_prefs.llm_provider}")
+            else:
+                print("DEBUG: UserPreferences table empty.")
         except Exception as e:
             print(f"Error loading LLM config from DB: {e}")
+            # If we are really outside context, this will catch it.
 
+        # Provider
+        if provider:
+            self.provider = provider
+            print(f"DEBUG: Using passed provider arg: {provider}")
+        elif db_prefs and db_prefs.llm_provider:
+            self.provider = db_prefs.llm_provider
+            print(f"DEBUG: Using DB provider: {self.provider}")
+        else:
+            self.provider = settings.LLM_PROVIDER
+            print(f"DEBUG: Fallback to Settings provider: {self.provider}")             
+        
+        d_anthropic_key = db_prefs.anthropic_api_key if db_prefs else None
+        d_groq_key = db_prefs.groq_api_key if db_prefs else None
+        d_cerebras_key = getattr(db_prefs, 'cerebras_api_key', None) # Handle migration later
+        d_local_base_url = db_prefs.local_llm_base_url if db_prefs else None
+        d_local_model = getattr(db_prefs, 'local_llm_model', None) # Use getattr for safety
+        
+        # Settings Fallbacks
+        s_local_model = settings.LOCAL_LLM_MODEL
+        s_local_base_url = settings.LOCAL_LLM_BASE_URL
+        s_openai_key = settings.OPENAI_API_KEY
+        d_openai_key = db_prefs.openai_api_key if db_prefs else None
+        s_anthropic_key = settings.ANTHROPIC_API_KEY
+        s_groq_key = settings.GROQ_API_KEY
+        s_cerebras_key = getattr(settings, 'CEREBRAS_API_KEY', None)
+        
+        # Ollama Settings
+        self.ollama_num_ctx = db_prefs.ollama_num_ctx if db_prefs else settings.OLLAMA_NUM_CTX
+        
         # Initialize Client based on Provider
         if self.provider == LLMProvider.OPENAI:
-            self.client = OpenAI(api_key=openai_key)
-            self.model = settings.OPENAI_MODEL # Fallback defaults
+            key = api_key or d_openai_key or s_openai_key
+            self.client = OpenAI(api_key=key)
+            self.model = model or settings.OPENAI_MODEL # Fallback defaults
             
         elif self.provider == LLMProvider.ANTHROPIC:
-            self.client = Anthropic(api_key=anthropic_key)
-            self.model = settings.ANTHROPIC_MODEL
+            key = api_key or d_anthropic_key or s_anthropic_key
+            self.client = Anthropic(api_key=key)
+            self.model = model or settings.ANTHROPIC_MODEL
 
         elif self.provider == LLMProvider.GROQ:
+            key = api_key or d_groq_key or s_groq_key
             self.client = OpenAI(
                 base_url="https://api.groq.com/openai/v1",
-                api_key=groq_key or "gsk_..." # Placeholder if empty, will fail gracefully
+                api_key=key or "gsk_..." 
             )
-            self.model = settings.GROQ_MODEL
+            self.model = model or settings.GROQ_MODEL
             
-        elif self.provider == LLMProvider.OLLAMA:
+        elif self.provider == LLMProvider.LLAMACPP:
+            # llama.cpp server (OpenAI-compatible, lightweight GGUF server)
+            # Always use settings default (which is correct for Docker), ignore DB overrides
+            url = base_url or settings.LLAMACPP_BASE_URL
+
             self.client = OpenAI(
-                base_url=settings.OLLAMA_BASE_URL,
-                api_key="ollama" 
+                base_url=url,
+                api_key="not-needed"
             )
-            self.model = local_model
+            self.model = model or s_local_model
+            self.llamacpp_num_ctx = getattr(settings, 'LLAMACPP_NUM_CTX', 2048)
+
+        elif self.provider == LLMProvider.OLLAMA:
+            # For Ollama, we can use the passed base_url or the internal docker one
+            # If base_url is passed (e.g. from Custom/LM Studio override), use it, otherwise default to internal
+            url = base_url or settings.OLLAMA_BASE_URL
+            self.client = OpenAI(
+                base_url=url,
+                api_key="ollama"
+            )
+            self.model = model or s_local_model
+
+        elif self.provider == LLMProvider.CEREBRAS:
+            key = api_key or d_cerebras_key or s_cerebras_key
+            self.client = OpenAI(
+                base_url="https://api.cerebras.ai/v1",
+                api_key=key
+            )
+            self.model = model or settings.CEREBRAS_MODEL
 
         elif self.provider == LLMProvider.LM_STUDIO:
+            url = base_url or d_local_base_url or s_local_base_url
+            
+            # Docker Fix: Replace localhost with host.docker.internal if running in Docker
+            # This handles cases where user sets 'http://localhost:1234' in settings but is running in a container
+            if url and ("localhost" in url or "127.0.0.1" in url):
+                if os.path.exists('/.dockerenv'): 
+                     url = url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal")
+                     print(f"DEBUG: Auto-corrected LM Studio URL to: {url}")
+            
+            # Ensure URL ends with /v1 for LM Studio
+            if url and not url.endswith("/v1"):
+                url = f"{url.rstrip('/')}/v1"
+                print(f"DEBUG: Appended /v1 to LM Studio URL: {url}")
+
             self.client = OpenAI(
-                base_url=local_base_url,
+                base_url=url,
                 api_key="lm-studio"
             )
-            self.model = local_model
+            self.model = model or s_local_model
         
-        # Generic Custom Provider (treated as OpenAI compatible)
+        # Generic Custom Provider (Dynamic Connections)
         else:
+             url = None
+             key = None
+             active_conn = None
+             
+             # Try to load from active connection if set
+             if db_prefs and db_prefs.active_connection_id:
+                 try:
+                     active_conn = db.session.query(LLMConnection).filter_by(id=db_prefs.active_connection_id).first()
+                 except Exception as e:
+                     print(f"Error loading active connection: {e}")
+             
+             if active_conn:
+                 url = active_conn.base_url
+                 key = active_conn.api_key
+                 # Use connection default model if no specific override
+                 if not model and active_conn.default_model:
+                     model = active_conn.default_model
+             else:
+                 # Fallback logic: check if we have manual overrides, otherwise ERROR if strictly custom
+                 # If the provider is explicitly set to 'custom' via DB/Settings, we MUST have a connection.
+                 # Failing to have one and falling back to localhost causes the confusing "Connection refused"
+                 
+                 # Check if we have explicit manual overrides (e.g. from env vars or partial DB state)
+                 # If we are here, it means provider was 'custom' (or fell through to else) AND active_conn was None.
+                 
+                 if self.provider == LLMProvider.CUSTOM:
+                      # If we don't have a valid active_conn ID, this is a misconfiguration.
+                      # We shouldn't silently default to localhost unless that WAS the intention.
+                      # But for 'custom', the intention is a specific connection.
+                      raise ValueError("LLM Provider is set to 'Custom' but no active connection is selected. Please select a connection in Settings.")
+
+                 # Legacy/Default fallback (for non-strict custom or other cases)
+                 url = base_url or d_local_base_url or s_local_base_url
+                 key = api_key or (db_prefs.custom_api_key if db_prefs else None) or "custom"
+
+             if url and ("localhost" in url or "127.0.0.1" in url):
+                if os.path.exists('/.dockerenv'): 
+                     url = url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal")
+                     print(f"DEBUG: Auto-corrected Custom URL to: {url}")
+
+             # Ensure URL ends with /v1 for Custom if it looks like an OpenAI wrapper (common ports or just generic fallback)
+             # Most compatible servers (Ollama, LM Studio, vLLM) need /v1
+             if url and not url.endswith("/v1") and not url.endswith("/v1/"):
+                  url = f"{url.rstrip('/')}/v1"
+                  print(f"DEBUG: Appended /v1 to Custom URL: {url}")
+
              self.client = OpenAI(
-                base_url=local_base_url,
-                api_key="custom"
+                base_url=url,
+                api_key=key or "not-needed"
             )
-             self.model = local_model
+             self.model = model or s_local_model
+             
+        print(f"DEBUG: LLMClient Initialized. Provider: {self.provider}. Base URL: {self.client.base_url}")
             
-    def chat(self, system: str, messages: list) -> str:
+    def chat(self, system: str, messages: list, images: list = None, model: str = None, json_schema: dict = None) -> str:
         """
         Unified chat method.
         messages format: [{"role": "user", "content": "..."}]
+        images: list of base64 strings (optional)
+        model: optional model name to override the default/selected model
+        json_schema: optional JSON schema dict to force structured output (format: {"name": "...", "strict": True, "schema": {...}})
         """
-        # Use runtime-selected model if available, otherwise fall back to config
-        active_model = model_manager.get_model() or self.model
+        # Use explicit model if provided, otherwise check manager, otherwise default
+        active_model = model or model_manager.get_model() or self.model
 
         try:
             if self.provider == LLMProvider.ANTHROPIC:
                 # Convert system message to Anthropic format (param)
+                # Anthropic Vision support: format user message content as list
+                
+                final_messages = messages
+                
+                # If there are images, we need to restructure the LAST user message (which contains the prompt)
+                if images:
+                     # Find the last user message
+                     last_msg = None
+                     for m in reversed(messages):
+                         if m['role'] == 'user':
+                             last_msg = m
+                             break
+                     
+                     if last_msg:
+                         content_block = []
+                         # Add images first
+                         for img_b64 in images:
+                             # Strip prefix if present (data:image/jpeg;base64,...)
+                             if "," in img_b64:
+                                 img_b64 = img_b64.split(",")[1]
+                                 
+                             content_block.append({
+                                 "type": "image",
+                                 "source": {
+                                     "type": "base64",
+                                     "media_type": "image/jpeg", # Assuming jpeg for now, or detect?
+                                     "data": img_b64
+                                 }
+                             })
+                         # Add text
+                         content_block.append({
+                             "type": "text",
+                             "text": last_msg['content']
+                         })
+                         last_msg['content'] = content_block
+
                 response = self.client.messages.create(
                     model=active_model,
                     max_tokens=1024,
                     system=system,
-                    messages=messages
+                    messages=final_messages
                 )
                 return response.content[0].text
 
             else:
                 # OpenAI / Compatible (Ollama, LM Studio)
                 # Prepend system message
-                full_messages = [{"role": "system", "content": system}] + messages
+                
+                # Handle images for OpenAI/Ollama 
+                # They use "content": [{"type": "text", "text": "..." }, { "type": "image_url", "image_url": { "url": "data:image/jpeg;base64,..." } }]
+                
+                final_messages = []
+                # Copy messages to avoid mutating original list reference issues
+                import copy
+                msgs_copy = copy.deepcopy(messages)
+                
+                if images:
+                     # Attach images to the last user message
+                     last_msg = None
+                     for m in reversed(msgs_copy):
+                         if m['role'] == 'user':
+                             last_msg = m
+                             break
+                     
+                     if last_msg:
+                         text_content = last_msg['content']
+                         new_content = [{"type": "text", "text": text_content}]
+                         
+                         for img_b64 in images:
+                             # Ensure prefix is present for OpenAI/Ollama
+                             if "," not in img_b64:
+                                 img_b64 = f"data:image/jpeg;base64,{img_b64}"
+                                 
+                             new_content.append({
+                                 "type": "image_url",
+                                 "image_url": {
+                                     "url": img_b64
+                                 }
+                             })
+                         last_msg['content'] = new_content
+
+                full_messages = [{"role": "system", "content": system}] + msgs_copy
 
                 import json
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.info(f"Using model: {active_model}")
-                logger.info(f"Sending payload to LLM: {json.dumps(full_messages, indent=2)}")
+                # logger.info(f"Sending payload to LLM: {json.dumps(full_messages, indent=2)}") # Too verbose with base64
 
-                # Prepare options directly supported by Ollama
+                # Prepare options directly supported by Ollama and llama.cpp
                 extra_body = {}
                 if self.provider == LLMProvider.OLLAMA:
                      extra_body["options"] = {
-                         "num_ctx": settings.OLLAMA_NUM_CTX
+                         "num_ctx": getattr(self, 'ollama_num_ctx', 2048) or settings.OLLAMA_NUM_CTX
                      }
+                elif self.provider == LLMProvider.LLAMACPP:
+                     # llama.cpp uses different parameter names but is compatible
+                     extra_body["n_predict"] = max_tokens if 'max_tokens' in locals() else 4096
 
-                response = self.client.chat.completions.create(
-                    model=active_model,
-                    messages=full_messages,
-                    temperature=0.7,
-                    extra_body=extra_body
-                )
-                logger.info(f"Received response from LLM: {response.model_dump_json()}")
+                # Get generation parameters from DB
+                try:
+                    prefs = db.session.query(UserPreferences).first()
+                    max_tokens = prefs.llm_max_tokens if prefs else 4096
+                    temperature = prefs.llm_temperature if prefs else 0.7
+                    top_p = prefs.llm_top_p if prefs else 0.9
+                    freq_penalty = prefs.llm_frequency_penalty if prefs else 0.3
+                    pres_penalty = prefs.llm_presence_penalty if prefs else 0.1
+                except:
+                    # Safe defaults if DB not available
+                    max_tokens, temperature, top_p, freq_penalty, pres_penalty = 4096, 0.7, 0.9, 0.3, 0.1
+
+                # Build request parameters
+                request_params = {
+                    "model": active_model,
+                    "messages": full_messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "top_p": top_p,
+                    "frequency_penalty": freq_penalty,
+                    "presence_penalty": pres_penalty,
+                    "extra_body": extra_body
+                }
+
+                # Add JSON schema if provided (for structured output)
+                if json_schema:
+                    request_params["response_format"] = {
+                        "type": "json_schema",
+                        "json_schema": json_schema
+                    }
+
+                response = self.client.chat.completions.create(**request_params)
+
+                # Log response (wrapped in try-except to handle different response formats)
+                try:
+                    response_json = response.model_dump_json()
+                    try:
+                        parsed = json.loads(response_json)
+                        logger.info(f"Received response from LLM:\n{json.dumps(parsed, indent=2)}")
+                    except:
+                        logger.info(f"Received response from LLM: {response_json}")
+                except Exception as log_err:
+                    logger.debug(f"Could not serialize response for logging: {log_err}")
+
                 return response.choices[0].message.content
                 
         except Exception as e:

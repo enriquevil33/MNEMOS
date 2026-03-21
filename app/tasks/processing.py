@@ -7,12 +7,17 @@ from app.services.chunker import ChunkerService
 from app.services.epub_processor import EpubProcessor
 from app.services.embedder import EmbedderService
 from app.services.youtube import YouTubeService
+from app.services.llm_client import get_llm_client, reset_client
 from config.settings import settings
+from app.utils.archive import archive_file
 import os
 import logging
 import time
 from uuid import UUID
 import requests
+import json
+import docker
+from app.utils.hf_downloader import HFDownloader
 
 # Configure Logger for Worker
 logger = logging.getLogger(__name__)
@@ -27,6 +32,9 @@ def process_document_task(self, document_id: str):
     with app.app_context():
         try:
             logger.info(f"Starting processing for document {document_id}")
+            
+            # Ensure Worker picks up latest LLM settings from DB
+            reset_client()
             
             doc = db.session.get(Document, UUID(document_id))
             if not doc:
@@ -56,6 +64,11 @@ def process_document_task(self, document_id: str):
                          "title": info["title"]  # Redundant but useful for RAG context standardized keys
                      }
                      logger.info(f"YouTube download complete: {doc.file_path}")
+
+                     # Archive downloaded YouTube audio if enabled
+                     youtube_audio_path = os.path.join(settings.UPLOAD_FOLDER, doc.file_path)
+                     if archive_file(youtube_audio_path, doc.file_path, 'youtube'):
+                         logger.info(f"YouTube audio archived: {doc.file_path}")
                 
                 # Now treat as audio
                 full_path = os.path.join(settings.UPLOAD_FOLDER, doc.file_path)
@@ -63,6 +76,27 @@ def process_document_task(self, document_id: str):
                 logger.info(f"Transcribing audio: {full_path}")
                 segments = transcriber.transcribe(full_path)
                 
+                # Save transcription to file (Auto-save)
+                try:
+                    from sqlalchemy.orm.attributes import flag_modified
+                    
+                    os.makedirs(settings.TRANSCRIPTION_FOLDER, exist_ok=True)
+                    transcription_filename = f"{doc.id}_transcription.txt"
+                    transcription_path = os.path.join(settings.TRANSCRIPTION_FOLDER, transcription_filename)
+                    if TranscriptionService.save_to_txt(segments, transcription_path):
+                        logger.info(f"Saved transcription to {transcription_path}")
+                        
+                        # Force refresh metadata
+                        db.session.refresh(doc)
+                        current_meta = dict(doc.metadata_ or {})
+                        current_meta["transcription_file"] = transcription_filename
+                        doc.metadata_ = current_meta
+                        flag_modified(doc, "metadata_")
+                        
+                        db.session.commit()
+                except Exception as e:
+                    logger.error(f"Error saving transcription file: {e}")
+
                 # Merge small segments into meaningful chunks
                 chunker = ChunkerService()
                 text_chunks = chunker.chunk_transcript_segments(segments)
@@ -73,6 +107,23 @@ def process_document_task(self, document_id: str):
                 logger.info(f"Transcribing file: {full_path}")
                 segments = transcriber.transcribe(full_path)
                 
+                # Save transcription to file (Auto-save)
+                try:
+                    from sqlalchemy.orm.attributes import flag_modified
+                    os.makedirs(settings.TRANSCRIPTION_FOLDER, exist_ok=True)
+                    transcription_filename = f"{doc.id}_{doc.filename}_transcription.txt"
+                    transcription_path = os.path.join(settings.TRANSCRIPTION_FOLDER, transcription_filename)
+                    
+                    if TranscriptionService.save_to_txt(segments, transcription_path):
+                        logger.info(f"Saved transcription to {transcription_path}")
+                        current_meta = dict(doc.metadata_ or {})
+                        current_meta["transcription_file"] = transcription_filename
+                        doc.metadata_ = current_meta
+                        flag_modified(doc, "metadata_")
+                        db.session.commit()
+                except Exception as e:
+                    logger.error(f"Error saving transcription file: {e}")
+
                 # Merge small segments into meaningful chunks
                 chunker = ChunkerService()
                 text_chunks = chunker.chunk_transcript_segments(segments)
@@ -96,8 +147,10 @@ def process_document_task(self, document_id: str):
                 for page in pages:
                     sub_chunks = chunker.chunk_text(page["text"])
                     for i, sub in enumerate(sub_chunks):
+                        # Sanitize text for Postgres (no null bytes)
+                        clean_text = sub.replace('\x00', '')
                         text_chunks.append({
-                            "text": sub,
+                            "text": clean_text,
                             "page": page["page"],
                             "chunk_index": i
                         })
@@ -121,8 +174,9 @@ def process_document_task(self, document_id: str):
                 for page in pages:
                     sub_chunks = chunker.chunk_text(page["text"])
                     for i, sub in enumerate(sub_chunks):
+                        clean_text = sub.replace('\x00', '')
                         text_chunks.append({
-                            "text": sub,
+                            "text": clean_text,
                             "page": page["page"],
                             "chunk_index": i
                         })
@@ -131,8 +185,57 @@ def process_document_task(self, document_id: str):
             doc.processing_progress = 30  # Extraction done
             db.session.commit()
 
+
+
             # 2. Vectorize and Save Chunks
             embedder = EmbedderService()
+
+            # --- DETECT LANGUAGE (New Step) ---
+            try:
+                from langdetect import detect
+                # Sample first 2000 chars for detection
+                sample_text = " ".join([c["text"] for c in text_chunks[:5]])[:2000]
+                detected_code = detect(sample_text)
+                
+                # Map to Postgres Dictionaries
+                # Postgres supports: english, spanish, german, french, italian, etc.
+                # We map codes to standard names. Fallback handled by Trigger ('simple').
+                lang_map = {
+                    'en': 'english',
+                    'es': 'spanish',
+                    'de': 'german',
+                    'fr': 'french',
+                    'it': 'italian',
+                    'ru': 'russian',
+                    'pt': 'portuguese',
+                    'nl': 'dutch',
+                    'sv': 'swedish',
+                    'no': 'norwegian',
+                    'da': 'danish',
+                    'fi': 'finnish'
+                }
+                
+                # Check for Chinese variants
+                if detected_code.lower().startswith('zh'):
+                    # To support Chinese, we typically need pg_jieba. 
+                    # If not installed, our trigger maps unknown strings to 'simple'
+                    # so we pass 'chinese' (or 'simple') as the value.
+                    doc_language = 'simple' 
+                else:
+                    doc_language = lang_map.get(detected_code, 'simple')
+
+                logger.info(f"Detected language: {detected_code} -> {doc_language}")
+                
+                doc.language = doc_language
+                # Chunks will inherit this language in the loop below
+                
+                db.session.commit()
+            except Exception as e:
+                logger.error(f"Language detection failed: {e}. Defaulting to 'english'.")
+                # Default is typically english or simple
+                doc.language = 'simple'
+                doc_language = 'simple'
+
 
             texts_to_embed = [c["text"] for c in text_chunks]
             if texts_to_embed:
@@ -145,7 +248,7 @@ def process_document_task(self, document_id: str):
 
                 elapsed = time.time() - start_time
                 logger.info(f"Embeddings generated in {elapsed:.2f}s ({len(texts_to_embed)/elapsed:.1f} chunks/sec)")
-                doc.processing_progress = 80  # Embeddings done
+                doc.processing_progress = 70  # Embeddings done
                 db.session.commit()
 
                 # Save chunks to database
@@ -158,13 +261,38 @@ def process_document_task(self, document_id: str):
                         start_time=chunk_data.get("start"),
                         end_time=chunk_data.get("end"),
                         page_number=chunk_data.get("page"),
-                        embedding=embeddings[i]
+                        embedding=embeddings[i],
+                        language=doc_language # Explicitly set language so trigger works correctly
                     )
                     db.session.add(new_chunk)
                 logger.info(f"Saved {len(text_chunks)} chunks to database")
-                doc.processing_progress = 95  # Saving done
-                db.session.commit()
+                
+                # --- Generate Document Summary (Summary Indexing) ---
+                _generate_summary_logic(doc.id)
 
+                # --- Hypergraph Extraction (New Step) ---
+                try:
+                    from app.services.hypergraph_extractor import HypergraphExtractor
+                    doc.processing_progress = 90
+                    db.session.commit()
+                    HypergraphExtractor.process_document(doc.id)
+                except Exception as hg_e:
+                    logger.error(f"Hypergraph extraction failed (non-blocking): {hg_e}")
+
+                # --- Graph Unification (Phase 2) ---
+                try:
+                    from app.services.graph_unifier import GraphUnifierService
+                    from app.models.section import DocumentSection
+                    
+                    logger.info("Starting Graph Unification (Phase 2)...")
+                    sections = db.session.query(DocumentSection).filter_by(document_id=doc.id).all()
+                    for section in sections:
+                        GraphUnifierService.process_section(str(section.id))
+                    logger.info("Graph Unification complete.")
+                    
+                except Exception as gu_e:
+                    logger.error(f"Graph Unification failed (non-blocking): {gu_e}")
+                
             doc.status = 'completed'
             doc.processing_progress = 100
             db.session.commit()
@@ -179,47 +307,134 @@ def process_document_task(self, document_id: str):
                  db.session.commit()
             raise e
 
+def _generate_summary_logic(document_id):
+    """
+    Helper function to generate summary for a document.
+    Can be called from main processing task or independent summary task.
+    """
+    from app.services.summary_service import SummaryService
+    try:
+        SummaryService.generate_summary(document_id)
+    except Exception as e:
+        logger.error(f"Failed to generate summary (wrapper): {e}")
+
+@celery_app.task(bind=True)
+def generate_summary_task(self, document_id: str):
+    """
+    Standalone task to generate summary (e.g. retry).
+    """
+    from app import create_app
+    app = create_app()
+    with app.app_context():
+        try:
+             # Set status to processing so UI shows bar
+             doc = db.session.get(Document, UUID(document_id))
+             if doc:
+                 doc.status = 'processing'
+                 doc.processing_progress = 50 
+                 db.session.commit()
+                 
+             _generate_summary_logic(document_id)
+             
+             # Mark done
+             if doc:
+                 doc.status = 'completed'
+                 doc.processing_progress = 100
+                 db.session.commit()
+                 
+             return "Summary generated"
+        except Exception as e:
+            logger.error(f"Error in generate_summary_task: {e}")
+            # Ensure we don't leave it stuck if we can help it
+            try:
+                doc = db.session.get(Document, UUID(document_id))
+                if doc:
+                    doc.status = 'error'
+                    doc.error_message = str(e)
+                    db.session.commit()
+            except:
+                pass
+            raise e
+
+@celery_app.task(bind=True)
+def reprocess_hypergraph_task(self, document_id: str):
+    """
+    Task to specifically re-run hypergraph extraction for a document.
+    """
+    from app import create_app
+    app = create_app()
+    with app.app_context():
+        try:
+            logger.info(f"Starting generic hypergraph reprocessing for {document_id}")
+            from app.services.hypergraph_extractor import HypergraphExtractor
+            
+            # Simple wrapper
+            HypergraphExtractor.process_document(document_id)
+            return f"Hypergraph processed for {document_id}"
+            
+        except Exception as e:
+            logger.error(f"Error in reprocess_hypergraph_task: {e}")
+            raise e
+
+
 @celery_app.task(bind=True)
 def download_model_task(self, model_name):
     """
-    Celery task for downloading a model in the background.
-    This allows the API to return immediately while the download runs in the background.
+    DEPRECATED: Celery task for downloading Ollama models.
+    This is no longer used as the system now uses llama.cpp instead of Ollama.
+    Use download_gguf_task for GGUF model downloads instead.
     """
+    logger.error(f"download_model_task called but Ollama is deprecated. Use download_gguf_task instead.")
+    return {
+        'status': 'error',
+        'model_name': model_name,
+        'error': 'Ollama model downloads are deprecated. Please use GGUF downloads for llama.cpp instead.'
+    }
+
+@celery_app.task(bind=True)
+def download_gguf_task(self, repo_id, filename, model_name):
+    """
+    Download a GGUF file from HF for llama.cpp.
+    Note: Ollama import functionality is deprecated. llama.cpp reads GGUF files directly from /models.
+    """
+    logger.info(f"Starting GGUF download: {repo_id}/{filename} as {model_name}")
     try:
-        base_url = settings.OLLAMA_BASE_URL.replace("/v1", "")
+        def progress_callback(current, total):
+            if total > 0:
+                percent = (current / total) * 100
+                # Throttle updates slightly to avoid spamming Redis
+                self.update_state(
+                    state='PROGRESS',
+                    meta={
+                        'status': 'downloading',
+                        'progress': percent,
+                        'current': current,
+                        'total': total,
+                        'model_name': model_name
+                    }
+                )
 
-        # Track download progress
-        last_progress = None
+        # Download GGUF file to models directory
+        dest_path = HFDownloader.download_file(repo_id, filename, progress_callback)
+        logger.info(f"Download complete: {dest_path}")
 
-        with requests.post(
-            f"{base_url}/api/pull",
-            json={"name": model_name},
-            stream=True,
-            timeout=1800  # 30 minutes timeout for the download
-        ) as r:
-            r.raise_for_status()
+        # For llama.cpp: No import step needed. The server loads GGUF files directly from /models.
+        # Just verify the file exists and is readable
+        if not os.path.exists(dest_path):
+            raise Exception(f"Downloaded file not found at {dest_path}")
 
-            # Process the response and send updates as the download progresses
-            for line in r.iter_lines():
-                if line:
-                    try:
-                        progress_str = line.decode('utf-8')
-                        # Update the task state with progress
-                        self.update_state(
-                            state='PROGRESS',
-                            meta={
-                                'status': 'downloading',
-                                'progress_line': progress_str,
-                                'model_name': model_name
-                            }
-                        )
-                        last_progress = progress_str
-                    except Exception as e:
-                        logger.error(f"Error processing progress line: {e}")
+        file_size = os.path.getsize(dest_path)
+        logger.info(f"Successfully downloaded {filename} ({file_size / (1024**3):.2f} GB)")
+        logger.info(f"Model ready for llama.cpp at: {dest_path}")
 
-        logger.info(f"Model download completed for {model_name}")
-        return {'status': 'success', 'model_name': model_name, 'last_progress': last_progress}
+        return {
+            'status': 'success',
+            'model_name': model_name,
+            'path': dest_path,
+            'filename': filename,
+            'size_gb': round(file_size / (1024**3), 2)
+        }
 
     except Exception as e:
-        logger.error(f"Error downloading model {model_name}: {e}")
-        return {'status': 'error', 'model_name': model_name, 'error': str(e)}
+        logger.error(f"GGUF Task failed: {e}")
+        return {'status': 'failure', 'error': str(e)}

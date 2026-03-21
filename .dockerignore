@@ -26,3 +26,7 @@ uploads
 whisper_cache
 localRag
 data
+models
+*.gguf
+*.Modelfile
+migrations_backup

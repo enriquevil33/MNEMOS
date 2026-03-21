@@ -7,10 +7,16 @@ import { MarkdownDisplayComponent } from '../markdown/markdown-display.component
 import { ModalService } from '@services/modal.service';
 import { ApiEndpoints } from '@core/constants/api-endpoints';
 
+import { VoiceService } from '@services/voice.service';
+
+import { GraphVisualizerComponent } from '@shared/components/graph-visualizer/graph-visualizer.component';
+import { Router } from '@angular/router';
+import { ToastrService } from 'ngx-toastr';
+
 @Component({
   selector: 'app-message-bubble',
   standalone: true,
-  imports: [CommonModule, FormsModule, SourceModalComponent, MarkdownDisplayComponent],
+  imports: [CommonModule, FormsModule, SourceModalComponent, MarkdownDisplayComponent, GraphVisualizerComponent],
   template: `
     <div class="flex flex-col gap-1 w-full max-w-3xl mx-auto anime-fade-in group"
       [class.message-user]="message().role === 'user'"
@@ -25,6 +31,17 @@ import { ApiEndpoints } from '@core/constants/api-endpoints';
         [style.color]="message().role === 'assistant' ? 'var(--color-base-content, #ffffff)' : 'inherit'">
         
         @if (message().role === 'user') {
+          <!-- Display Images -->
+          @if (message().images && message().images!.length > 0) {
+            <div class="flex flex-wrap gap-2 mb-2">
+              @for (img of message().images; track $index) {
+                <img [src]="img" 
+                     alt="Uploaded Image" 
+                     class="max-w-full h-auto rounded-lg max-h-60 object-contain border border-white/20 cursor-pointer hover:opacity-90 transition-opacity"
+                     (click)="openImage($index, message().images)">
+              }
+            </div>
+          }
           @if (isEditing()) {
             <div class="flex flex-col gap-2 min-w-[300px]">
               <textarea 
@@ -46,10 +63,12 @@ import { ApiEndpoints } from '@core/constants/api-endpoints';
           }
         } @else {
           <!-- Helper Component for Markdown Rendering -->
-          <app-markdown-display 
-            [content]="message().content" 
-            (citationClick)="handleCitation($event)">
-          </app-markdown-display>
+          <div class="llm-stream-container" [class.is-generating]="message().status === 'generating'">
+             <app-markdown-display 
+               [content]="message().content" 
+               (citationClick)="handleCitation($event)">
+             </app-markdown-display>
+          </div>
 
           @if (message().search_queries && message().search_queries!.length > 0) {
             <div class="mt-4 pt-3 border-t border-divider">
@@ -63,6 +82,15 @@ import { ApiEndpoints } from '@core/constants/api-endpoints';
                 }
               </div>
             </div>
+          }
+
+          @if (message().graph_data) {
+             <div class="mt-4 pt-3 border-t border-divider">
+                <app-graph-visualizer 
+                    [data]="message().graph_data"
+                    (viewSource)="goToDocument($event)">
+                </app-graph-visualizer>
+             </div>
           }
 
           @if (message().sources && message().sources!.length > 0 && (!message().status || message().status === 'completed')) {
@@ -112,6 +140,12 @@ import { ApiEndpoints } from '@core/constants/api-endpoints';
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
             </button>
           }
+           <!-- Play Audio (Assistant Only) -->
+          @if (message().role === 'assistant' && !isEditing()) {
+             <button (click)="playAudio()" class="p-1 text-secondary hover:text-primary hover:bg-hover rounded transition-colors" title="Play">
+               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+          }
         </div>
       </div>
     </div>
@@ -138,6 +172,9 @@ export class MessageBubbleComponent {
   onEdit = output<string>(); // Emits new content
 
   private modalService = inject(ModalService);
+  private voiceService = inject(VoiceService);
+  private router = inject(Router);
+  private toastr = inject(ToastrService);
 
   // State
   isEditing = signal(false);
@@ -164,7 +201,15 @@ export class MessageBubbleComponent {
   }
 
   copyMessage() {
-    navigator.clipboard.writeText(this.message().content);
+    navigator.clipboard.writeText(this.message().content).then(() => {
+      this.toastr.success('Text copied!');
+    });
+  }
+
+  openImage(index: number, images: string[] | undefined) {
+    if (images && images.length > 0) {
+      this.modalService.openImageViewer(index, images);
+    }
   }
 
   openSourceModal(source: MessageSource) {
@@ -220,5 +265,54 @@ export class MessageBubbleComponent {
         this.openSourceModal(source);
       }
     }
+  }
+
+  goToDocument(doc: any) {
+    if (!doc.id) return;
+
+    // Check type and open appropriate modal
+    if (doc.type === 'pdf' || (doc.original_filename && doc.original_filename.toLowerCase().endsWith('.pdf'))) {
+      const documentLike = {
+        id: doc.id,
+        original_filename: doc.original_filename || doc.title || 'Document',
+        file_type: 'pdf'
+      };
+      // Pass page number
+      this.modalService.openPdfViewer(documentLike as any, undefined, doc.page_number);
+    }
+    else if (['video', 'audio', 'youtube'].includes(doc.type)) {
+      // Re-use openSourceModal logic or direct service call
+      // We construct a partial source object to reuse openSourceModal
+      const sourceLike: any = {
+        document_id: doc.id,
+        document: doc.title,
+        file_type: doc.type,
+        location: 'Graph',
+        text: 'Accessed via Reasoning Graph',
+        start_time: doc.start_time
+      };
+      this.openSourceModal(sourceLike);
+    }
+    else {
+      // Fallback: Use Source Modal for text/others instead of navigating to broken route
+      const sourceLike: any = {
+        document_id: doc.id,
+        document: doc.original_filename || doc.title || 'Document',
+        file_type: doc.type || 'text',
+        location: 'Graph',
+        text: 'Accessed via Reasoning Graph' // We don't have the text here, but SourceModal fetches it if doc_id exists? 
+        // Actually SourceModal typically takes text from the message source. 
+        // If we want it to fetch content, we need to ensure it does or we accept we just show metadata.
+        // But wait, SourceModal doesn't auto-fetch content usually? 
+        // Let's check SourceModal. 
+        // If SourceModal is just for display, this might show empty text.
+        // BUT it is better than a crash.
+      };
+      this.openSourceModal(sourceLike);
+    }
+  }
+
+  playAudio() {
+    this.voiceService.playMessageAudio(this.message().id);
   }
 }

@@ -1,193 +1,92 @@
-import { Component, computed, effect, inject, model, signal } from '@angular/core';
+import { Component, model, inject, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SettingsService } from '@services/settings.service';
-import { ChatPreferences } from '@core/models';
+import { LlmSelectorComponent } from '@shared/components/llm-selector/llm-selector.component';
 
 @Component({
-    selector: 'app-llm-selection-modal',
-    standalone: true,
-    imports: [CommonModule, FormsModule],
-    templateUrl: './llm-selection-modal.component.html'
+  selector: 'app-llm-selection-modal',
+  standalone: true,
+  imports: [CommonModule, FormsModule, LlmSelectorComponent],
+  template: `
+    @if (isVisible()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" (click)="closeModal()"></div>
+
+        <!-- Modal Content -->
+        <div class="relative w-full max-w-lg bg-panel rounded-2xl shadow-2xl border border-divider overflow-hidden anime-scale-in flex flex-col max-h-[90vh]">
+          
+          <!-- Header -->
+          <div class="flex items-center justify-between p-6 border-b border-divider bg-panel/50">
+            <h2 class="text-xl font-semibold text-primary">Select AI Provider</h2>
+            <button (click)="closeModal()" class="btn btn-ghost btn-sm btn-circle">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="p-6 overflow-y-auto custom-scrollbar">
+            <app-llm-selector 
+                [preferences]="settingsService.chatPreferences()"
+                #llmSelector>
+            </app-llm-selector>
+          </div>
+
+          <!-- Footer -->
+          <div class="flex items-center justify-end gap-3 p-6 border-t border-divider bg-panel/50 mt-auto">
+            <button (click)="closeModal()" class="btn btn-ghost text-secondary hover:text-primary">Cancel</button>
+            <button (click)="saveSettings()" class="btn btn-primary shadow-lg shadow-accent/20">Save Changes</button>
+          </div>
+
+        </div>
+      </div>
+    }
+    `,
+  styles: [`
+    .anime-scale-in { animation: scaleIn 0.2s ease-out forwards; }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    `]
 })
 export class LlmSelectionModalComponent {
-    // Inputs
-    isVisible = model<boolean>(false);
+  isVisible = model<boolean>(false);
+  settingsService = inject(SettingsService);
 
-    // Services
-    settingsService = inject(SettingsService);
+  // Access the child component to get state
+  llmSelector = viewChild(LlmSelectorComponent);
 
-    // Hardcoded models
-    readonly openaiModels = ['gpt-4o', 'gpt-4o-mini', 'gpt-4.5-preview', 'o1-preview', 'o1-mini'];
-    readonly anthropicModels = ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-3-opus-latest'];
-    readonly groqModels = [
-        'llama-3.3-70b-versatile',
-        'llama-3.1-70b-versatile',
-        'llama-3.1-8b-instant',
-        'llama3-70b-8192',
-        'llama3-8b-8192',
-        'gemma2-9b-it',
-        'gemma-7b-it',
-        'deepseek-r1-distill-llama-70b',
-        'openai/gpt-oss-120b',
-        'openai/gpt-oss-20b'
-    ];
+  closeModal() {
+    this.isVisible.set(false);
+  }
 
-    // Signals for local state (initially populated from settings)
-    selectedProvider = signal<string>('ollama');
-    apiKey = signal<string>('');
-    baseUrl = signal<string>('');
-    customModelId = signal<string>('');
-    selectedModel = signal<string>(''); // For dropdown selection
+  async saveSettings() {
+    const selector = this.llmSelector();
+    if (!selector) return;
 
-    constructor() {
-        // Effect to sync state when modal opens
-        effect(() => {
-            if (this.isVisible()) {
-                const prefs = this.settingsService.chatPreferences();
-                if (prefs) {
-                    // Initialize local state from global preferences without saving
-                    this.selectedProvider.set(prefs.llm_provider || 'ollama');
-                    this.syncInputsForProvider(prefs.llm_provider || 'ollama', prefs);
+    let update = selector.getSnapshot();
 
-                    // Initialize selected model
-                    if (prefs.llm_provider === 'ollama') {
-                        this.selectedModel.set(this.settingsService.currentModel() || '');
-                    } else {
-                        this.selectedModel.set(prefs.selected_llm_model || '');
-                    }
-                }
-            }
-        });
+    // Check if we need to auto-save the custom connection form (Unified Save Request)
+    if (update.llm_provider === 'custom') {
+      await selector.saveConnection();
+      // Refetch snapshot to get updated ID if it was new
+      update = selector.getSnapshot();
     }
 
-    // Computed
-    currentModels = computed(() => {
-        switch (this.selectedProvider()) {
-            case 'ollama':
-                return this.settingsService.models()?.models.map(m => m.name) || [];
-            case 'openai':
-                return this.openaiModels;
-            case 'anthropic':
-                return this.anthropicModels;
-            case 'groq':
-                return this.groqModels;
-            default:
-                return [];
-        }
-    });
+    const { ollamaModel, ...prefs } = update;
 
-    isManualModelInput = computed(() => {
-        return ['lm_studio', 'custom'].includes(this.selectedProvider()); // Groq now uses dropdown/select
-    });
+    // Save prefs
+    await this.settingsService.saveChatPreferences(prefs);
 
-    isApiKeyRequired = computed(() => {
-        return ['openai', 'anthropic', 'groq'].includes(this.selectedProvider());
-    });
-
-    // Methods
-    closeModal() {
-        this.isVisible.set(false);
+    // Set Ollama model if needed
+    if (ollamaModel) {
+      await this.settingsService.setCurrentModel(ollamaModel);
     }
 
-    syncInputsForProvider(provider: string, prefs: ChatPreferences) {
-        // Reset signals first to avoid stale data
-        this.apiKey.set('');
-        this.baseUrl.set('');
-        this.customModelId.set('');
-        this.selectedModel.set('');
-
-        switch (provider) {
-            case 'openai':
-                this.apiKey.set(prefs.openai_api_key || '');
-                this.selectedModel.set(prefs.selected_llm_model || '');
-                break;
-            case 'anthropic':
-                this.apiKey.set(prefs.anthropic_api_key || '');
-                this.selectedModel.set(prefs.selected_llm_model || '');
-                break;
-            case 'groq':
-                this.apiKey.set(prefs.groq_api_key || '');
-                this.selectedModel.set(prefs.selected_llm_model || '');
-                break;
-            case 'lm_studio':
-            case 'custom':
-            case 'ollama':
-                this.baseUrl.set(prefs.local_llm_base_url || '');
-                if (provider === 'custom') {
-                    this.apiKey.set(prefs.custom_api_key || '');
-                }
-                if (provider !== 'ollama') {
-                    this.customModelId.set(prefs.selected_llm_model || '');
-                } else {
-                    // For Ollama, we usually check currentModel from service, but initial sync handles this in effect
-                }
-                break;
-        }
-    }
-
-    // Update methods only update local state (Draft)
-    updateProvider(provider: string) {
-        this.selectedProvider.set(provider);
-        // When provider changes, we should try to pre-fill from existing preferences if available
-        const prefs = this.settingsService.chatPreferences();
-        if (prefs) {
-            this.syncInputsForProvider(provider, prefs);
-        }
-        // Force reset selected model if switching providers (unless sync found one)
-        if (!this.currentModels().includes(this.selectedModel())) {
-            this.selectedModel.set('');
-        }
-    }
-
-    updateApiKey(key: string) {
-        this.apiKey.set(key);
-    }
-
-    updateBaseUrl(url: string) {
-        this.baseUrl.set(url);
-    }
-
-    updateCustomModelId(id: string) {
-        this.customModelId.set(id);
-    }
-
-    updateSelectedModel(model: string) {
-        this.selectedModel.set(model);
-    }
-
-    async saveSettings() {
-        const provider = this.selectedProvider();
-        const update: Partial<ChatPreferences> = {
-            llm_provider: provider
-        };
-
-        // 1. Handle API Keys
-        if (provider === 'openai') update.openai_api_key = this.apiKey();
-        if (provider === 'anthropic') update.anthropic_api_key = this.apiKey();
-        if (provider === 'groq') update.groq_api_key = this.apiKey();
-        if (provider === 'custom') update.custom_api_key = this.apiKey();
-
-        // 2. Handle Base URL
-        if (['ollama', 'lm_studio', 'custom'].includes(provider)) {
-            update.local_llm_base_url = this.baseUrl();
-        }
-
-        // 3. Handle Model Selection
-        if (this.isManualModelInput()) {
-            update.selected_llm_model = this.customModelId();
-        } else if (provider === 'ollama') {
-            // For Ollama, we must call setCurrentModel
-            if (this.selectedModel()) {
-                await this.settingsService.setCurrentModel(this.selectedModel());
-            }
-        } else {
-            // For others (OpenAI, Anthropic, Groq), save to preferences
-            update.selected_llm_model = this.selectedModel();
-        }
-
-        // 4. Save Persistence
-        await this.settingsService.saveChatPreferences(update);
-        this.closeModal();
-    }
+    this.closeModal();
+  }
 }

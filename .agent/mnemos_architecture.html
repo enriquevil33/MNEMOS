@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MNEMOS Architecture Diagram</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #header {
+            z-index: 100;
+            background: #1f1f1f;
+            width: 100%;
+            text-align: center;
+            padding: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+            flex-shrink: 0;
+            border-bottom: 1px solid #333;
+        }
+
+        h1 {
+            color: #ffffff;
+            margin: 5px 0;
+            font-size: 1.4em;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 5px;
+            margin-top: 5px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 0.9em;
+            color: #eee;
+            font-weight: 500;
+        }
+
+        .color-box {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        #diagram-container {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            background: #121212;
+            position: relative;
+            cursor: grab;
+        }
+
+        #diagram-container:active {
+            cursor: grabbing;
+        }
+    </style>
+    <!-- PanZoom Library -->
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+</head>
+
+<body>
+
+    <div id="header">
+        <h1>MNEMOS SYSTEM ARCHITECTURE</h1>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="color-box" style="background:#FF9900; box-shadow: 0 0 10px #FF9900;"></div>Frontend
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background:#00CCFF; box-shadow: 0 0 10px #00CCFF;"></div>API
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background:#A020F0; box-shadow: 0 0 10px #A020F0;"></div>Services
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background:#00FF00; box-shadow: 0 0 10px #00FF00;"></div>Data
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background:#FF3366; box-shadow: 0 0 10px #FF3366;"></div>External
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background:#FFFF00; box-shadow: 0 0 10px #FFFF00; border-color: #333">
+                </div>Async
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Source for Mermaid -->
+    <pre id="mermaid-source" style="display:none">
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'primaryColor': '#1e1e1e',
+    'primaryTextColor': '#ffffff',
+    'primaryBorderColor': '#ffffff',
+    'lineColor': '#ffffff',
+    'secondaryColor': '#252526',
+    'tertiaryColor': '#2d2d30',
+    'fontSize': '16px',
+    'fontFamily': 'Segoe UI',
+    'clusterBkg': '#1a1a1a',
+    'clusterBorder': '#444'
+  },
+  'flowchart': {
+    'curve': 'basis',
+    'nodeSpacing': 50,
+    'rankSpacing': 80
+  }
+}}%%
+flowchart TD
+    %% --- Nodes & Subgraphs ---
+
+    %% Level 1: User
+    UserNode(["USER"])
+
+    %% Level 2: Frontend
+    subgraph Frontend ["FRONTEND (Angular 19)"]
+        direction LR
+        SPA["SPA Root"]
+        ChatUI["Chat"]
+        DocUI["Library"]
+        CollectionUI["Collections"]
+        GraphVis["GraphViz"]
+        SettingsUI["Settings"]
+    end
+
+    %% Level 3: API
+    subgraph Backend ["BACKEND (Flask)"]
+        direction TB
+        API["API Gateway"]
+        MCP["MCP Server"]
+    end
+
+    %% Level 4: Core Services
+    subgraph Services ["CORE SERVICES"]
+        direction TB
+        
+        subgraph Orchestration
+            direction LR
+            Logic["Orchestrator"]
+            ModelMgr["Model Manager"]
+        end
+
+        %% Split Ingestion and Logic to side-by-side
+        subgraph ProcessingLayers
+            direction LR
+            
+            subgraph Ingestion ["Ingestion Pipeline"]
+                direction TB
+                PDF["PDF"]
+                EPUB["EPUB"]
+                YT["YouTube"]
+                Transcriber["Whisper"]
+                Chunker["Chunker"]
+            end
+            
+            subgraph LogicLayer ["RAG & Reasoning"]
+                direction TB
+                RAG["RAG Engine"]
+                Hypergraph["Hypergraph"]
+                Reasoning["Reasoning"]
+                Summary["Summarizer"]
+                Memory["Memory"]
+            end
+        end
+
+        subgraph Connectors
+            direction LR
+            Embedder["Embedder"]
+            LLMClient["LLM Client"]
+            WebSearch["Web Search"]
+            TTS["TTS"]
+        end
+    end
+
+    %% Side Components (Async / External)
+    subgraph Async ["BACKGROUND WORKERS"]
+        direction TB
+        Redis["Redis Queue"]
+        Celery["Celery Worker"]
+    end
+
+    subgraph External ["EXTERNAL PROVIDERS"]
+        direction TB
+        CloudLLM["OpenAI / Anthropic"]
+        LocalLLM["Ollama / LM Studio"]
+        SearchAPI["Web Search"]
+    end
+
+    %% Level 5: Data
+    subgraph Data ["DATA PERSISTENCE"]
+        direction LR
+        PG[("PostgreSQL")]
+        VectorIdx["pgvector"]
+        DocDB["Docs"]
+        CollDB["Collections"]
+        GraphDB["Knowledge Graph"]
+        PrefDB["User Prefs"]
+    end
+
+    %% --- Connections ---
+
+    %% Top Down Flow
+    UserNode ==> SPA
+    SPA <==> API
+    
+    %% Internal Frontend Links
+    ChatUI -.-> API
+    DocUI -.-> API
+    CollectionUI -.-> API
+    SettingsUI -.-> API
+    GraphVis -.-> API
+
+    %% Backend Entry
+    API ==> Logic
+    MCP <==> RAG
+
+    %% Logic to Processing
+    Logic --> Ingestion
+    Logic --> LogicLayer
+    Logic --> ModelMgr
+
+    %% Processing to Connectors
+    Ingestion --> Connectors
+    LogicLayer --> Connectors
+
+    %% Explicit Service Flows
+    PDF --> Chunker
+    EPUB --> Chunker
+    YT --> Transcriber
+    Transcriber --> Chunker
+    Chunker --> Embedder
+    
+    RAG --> LLMClient
+    RAG --> Embedder
+    RAG --> WebSearch
+    
+    Hypergraph --> Connectors
+    Reasoning --> Connectors
+    Summary --> Connectors
+    
+    %% Async Handoff (Side Loop)
+    API -.-> Redis
+    Redis ==> Celery
+    Celery -.-> Ingestion
+    Celery -.-> LogicLayer
+
+    %% Data Persistence (Bottom)
+    Embedder --> VectorIdx
+    LLMClient -.-> CloudLLM
+    LLMClient -.-> LocalLLM
+    WebSearch -.-> SearchAPI
+    
+    RAG --> Memory
+    Memory <--> PrefDB
+    ModelMgr -.-> PrefDB
+    
+    %% Database Links
+    PG --- VectorIdx
+    PG --- DocDB
+    PG --- CollDB
+    PG --- GraphDB
+    PG --- PrefDB
+    
+    Hypergraph --> GraphDB
+    Reasoning <--> GraphDB
+
+    %% Styling with High Contrast
+
+    %% Frontend: Bright Orange
+    classDef frontend fill:#FF9900,stroke:#fff,stroke-width:2px,color:#000,font-weight:bold
+    
+    %% Backend: Bright Cyan
+    classDef backend fill:#00CCFF,stroke:#fff,stroke-width:2px,color:#000,font-weight:bold
+    
+    %% Services: Deep Purple
+    classDef service fill:#A020F0,stroke:#fff,stroke-width:2px,color:#fff,font-weight:bold
+    
+    %% Data: Matrix Green
+    classDef data fill:#00FF00,stroke:#fff,stroke-width:2px,color:#000,font-weight:bold
+    
+    %% External: Bright Red/Pink
+    classDef external fill:#FF3366,stroke:#fff,stroke-width:2px,color:#fff,font-weight:bold
+    
+    %% Async: Yellow
+    classDef async fill:#FFFF00,stroke:#fff,stroke-width:2px,color:#000,font-weight:bold
+
+    class SPA,ChatUI,DocUI,CollectionUI,GraphVis,SettingsUI frontend
+    class API,MCP backend
+    class Logic,ModelMgr,PDF,EPUB,YT,Transcriber,Chunker,RAG,Hypergraph,Reasoning,Summary,Memory,Embedder,LLMClient,WebSearch,TTS service
+    class PG,VectorIdx,DocDB,CollDB,GraphDB,PrefDB data
+    class CloudLLM,LocalLLM,SearchAPI external
+    class Redis,Celery async
+    </pre>
+
+    <div id="diagram-container"></div>
+
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+
+        mermaid.initialize({ startOnLoad: false });
+
+        async function renderDiagram() {
+            const graphDef = document.getElementById('mermaid-source').innerText;
+            const container = document.getElementById('diagram-container');
+
+            try {
+                // Render SVG
+                const { svg } = await mermaid.render('main-diagram', graphDef);
+                container.innerHTML = svg;
+
+                // SVG dimensions Fix
+                const svgElement = container.querySelector('svg');
+                const containerRect = container.getBoundingClientRect();
+
+                if (!svgElement.getAttribute('width') || svgElement.getAttribute('width').includes('%')) {
+                    svgElement.setAttribute('width', containerRect.width || 1200);
+                }
+                if (!svgElement.getAttribute('height') || svgElement.getAttribute('height').includes('%')) {
+                    svgElement.setAttribute('height', containerRect.height || 800);
+                }
+
+                svgElement.style.display = 'block';
+
+                setTimeout(() => {
+                    try {
+                        svgPanZoom(svgElement, {
+                            zoomEnabled: true,
+                            controlIconsEnabled: true,
+                            fit: true,
+                            center: true,
+                            minZoom: 0.1,
+                            maxZoom: 10
+                        });
+
+                        window.addEventListener('resize', () => {
+                            const newRect = container.getBoundingClientRect();
+                            svgElement.setAttribute('width', newRect.width);
+                            svgElement.setAttribute('height', newRect.height);
+                            const instance = svgPanZoom(svgElement);
+                            instance.resize();
+                            instance.fit();
+                            instance.center();
+                        });
+
+                    } catch (zoomError) {
+                        console.error("PanZoom Init Error:", zoomError);
+                    }
+                }, 100);
+
+            } catch (e) {
+                console.error(e);
+                container.innerHTML = `<div style="color:red; padding:20px;">Error rendering diagram: ${e.message}</div>`;
+            }
+        }
+        window.onload = renderDiagram;
+    </script>
+</body>
+
+</html>

@@ -1,5 +1,8 @@
 from sqlalchemy import Column, String, Text, DateTime, Enum, Integer
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID, JSONB, TSVECTOR
+from sqlalchemy import Computed, Index
+from pgvector.sqlalchemy import Vector
+from config.settings import settings
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from uuid import uuid4
@@ -23,14 +26,44 @@ class Document(db.Model):
     
     chunks = relationship('Chunk', back_populates='document', cascade='all, delete-orphan')
 
+    # New fields for Collections and Library
+    collection_id = Column(UUID(as_uuid=True), db.ForeignKey('collections.id'), nullable=True)
+    tag = Column(String(255)) # Simple tag for now
+    stars = Column(Integer, default=0)
+    comment = Column(Text)
+    
+    # RAG Optimization: Summary Indexing & Multi-Language
+    language = Column(String(50), default='english') # 'english', 'spanish', 'german', etc.
+    summary = Column(Text)
+    summary_embedding = Column(Vector(settings.EMBEDDING_DIMENSION))
+    
+    # Managed by DB Trigger: update_summary_search_vector
+    summary_search_vector = Column(TSVECTOR)
+
+    collection = relationship('Collection', backref='documents')
+
+    __table_args__ = (
+        Index('ix_documents_summary_embedding', summary_embedding, postgresql_using='hnsw',
+              postgresql_with={'m': 16, 'ef_construction': 64},
+              postgresql_ops={'summary_embedding': 'vector_cosine_ops'}),
+        Index('ix_documents_summary_search_vector', summary_search_vector, postgresql_using='gin'),
+    )
+
+
     def to_dict(self):
         return {
             "id": str(self.id),
             "filename": self.filename,
             "original_filename": self.original_filename,
             "file_type": self.file_type,
+            "youtube_url": self.youtube_url,
             "status": self.status,
             "processing_progress": self.processing_progress or 0,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "metadata": self.metadata_
+            "metadata": self.metadata_,
+            "collection_id": str(self.collection_id) if self.collection_id else None,
+            "tag": self.tag,
+            "stars": self.stars,
+            "comment": self.comment,
+            "summary": self.summary
         }

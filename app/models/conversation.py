@@ -30,7 +30,11 @@ class Message(db.Model):
     role = db.Column(db.String(50), nullable=False) # 'user' or 'assistant'
     content = db.Column(db.Text, nullable=False)
     sources = db.Column(JSONB, nullable=True)
+    search_queries = db.Column(JSONB, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    images = db.Column(JSONB, nullable=True)
+    audio_path = db.Column(db.String(512), nullable=True)
+    graph_data = db.Column(JSONB, nullable=True) # reasoning graph
 
     def to_dict(self):
         return {
@@ -39,5 +43,9 @@ class Message(db.Model):
             'role': self.role,
             'content': self.content,
             'sources': self.sources,
+            'search_queries': self.search_queries,
+            'images': self.images,
+            'audio_path': self.audio_path,
+            'graph_data': self.graph_data,
             'created_at': self.created_at.isoformat()
         }

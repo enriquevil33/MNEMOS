@@ -5,21 +5,84 @@ from config.settings import settings
 from app.services.model_manager import model_manager
 from app.extensions import db, celery_app
 from app.models.user_preferences import UserPreferences, SystemPrompt
+from app.models.llm_connection import LLMConnection
 from datetime import datetime
 
 bp = Blueprint('settings', __name__, url_prefix='/api/settings')
 
 @bp.route('/models', methods=['GET'])
+
 def get_models():
     """List available models from Ollama."""
     try:
-        # Use the internal docker URL
-        base_url = settings.OLLAMA_BASE_URL.replace("/v1", "") # Strip /v1 for native API
-        resp = requests.get(f"{base_url}/api/tags", timeout=5)
-        resp.raise_for_status()
-        return jsonify(resp.json())
+        base_url = settings.OLLAMA_BASE_URL.replace("/v1", "")
+
+        # Static descriptions for common models to enhance UI
+        MODEL_DESCRIPTIONS = {
+            'llama3': 'Meta Llama 3: The most capable openly available LLM to date.',
+            'qwen2.5': 'Qwen2.5: A comprehensive series of language models by Alibaba Cloud, optimized for code and reasoning.',
+            'mistral': 'Mistral: A high-performance 7B model that outperforms Llama 2 13B on all benchmarks.',
+            'gemma': 'Gemma: A family of lightweight, state-of-the-art open models from Google.',
+            'phi': 'Phi: A small language model by Microsoft that achieves performance comparable to much larger models.',
+            'hermes': 'Hermes: A series of uncensored, instruct-tuned models focused on creative writing and roleplay.'
+        }
+
+        try:
+            # Single call to get tags
+            resp = requests.get(f"{base_url}/api/tags", timeout=5)
+            # If successful, we consider the server running
+            is_running = resp.status_code == 200
+            
+            if is_running:
+                data = resp.json()
+                models = data.get('models', [])
+                
+                # Enhance models with descriptions and detailed vision check
+                for m in models:
+                    families = m.get('details', {}).get('families', []) or []
+                    name_lower = m.get('name', '').lower()
+                    
+                    # Vision detection
+                    is_vision = 'clip' in families or 'mllm' in families
+                    if not is_vision:
+                        if any(x in name_lower for x in ['llava', 'bakllava', 'moondream', 'minicpm', 'vision']):
+                            is_vision = True
+                    # In-place update for internal logic if needed, but we return 'models' list
+                    
+                    # Inject description
+                    m['description'] = "Local Ollama Model" # Default
+                    for key, desc in MODEL_DESCRIPTIONS.items():
+                        if key in name_lower:
+                            m['description'] = desc
+                            break
+
+                has_vision = any('vision' in m.get('name', '').lower() or 
+                               ('details' in m and ('clip' in m['details'].get('families', []) or 'mllm' in m['details'].get('families', [])))
+                               for m in models)
+            else:
+                models = []
+                has_vision = False
+
+        except requests.exceptions.RequestException:
+            is_running = False
+            has_vision = False
+            models = []
+
+        return jsonify({
+            'status': 'success',
+            'is_running': is_running,
+            'has_vision': has_vision,
+            'models': models
+        })
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error listing models: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'models': []
+        }), 500
+
 
 @bp.route('/models', methods=['DELETE'])
 def delete_model():
@@ -37,6 +100,54 @@ def delete_model():
         return jsonify({"success": True, "model": model_name})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@bp.route('/llamacpp/models', methods=['GET'])
+def get_llamacpp_models():
+    """List available GGUF models in the models/ directory for llamacpp."""
+    try:
+        import os
+        import glob
+
+        # Path to models directory (same as mounted in llamacpp container)
+        models_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'models')
+
+        if not os.path.exists(models_dir):
+            return jsonify({
+                'models': [],
+                'message': 'Models directory not found'
+            })
+
+        # Find all .gguf files
+        gguf_files = glob.glob(os.path.join(models_dir, '*.gguf'))
+
+        models = []
+        for file_path in gguf_files:
+            filename = os.path.basename(file_path)
+            file_size = os.path.getsize(file_path)
+            size_mb = round(file_size / (1024 * 1024), 2)
+
+            models.append({
+                'name': filename,
+                'filename': filename,
+                'size': file_size,
+                'size_mb': size_mb,
+                'path': f'/models/{filename}'
+            })
+
+        # Sort by size (smallest first for faster loading)
+        models.sort(key=lambda x: x['size'])
+
+        return jsonify({
+            'models': models,
+            'count': len(models)
+        })
+
+    except Exception as e:
+        logging.error(f"Error listing llamacpp models: {e}")
+        return jsonify({
+            'error': str(e),
+            'models': []
+        }), 500
 
 @bp.route('/library/search', methods=['GET'])
 def search_library():
@@ -336,29 +447,28 @@ def get_fallback_catalog(query=None):
 
     return jsonify({"models": catalog, "total": len(catalog), "fallback": True})
 
-from app.tasks.processing import download_model_task
+from app.tasks.processing import download_model_task, download_gguf_task
+from app.utils.hf_downloader import HFDownloader
 import uuid
 import os
 import json
 from celery.result import AsyncResult
 
-# KISS Persistence for Active Downloads
-# KISS Persistence for Active Downloads
-# Save in 'app' directory which is mounted to host, ensuring persistence across restarts
-DOWNLOADS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'active_downloads.json')
+# Persistence for Active Downloads
+ACTIVE_DOWNLOADS_FILE = os.path.join(os.path.dirname(__file__), '..', 'active_downloads.json')
 
 def load_downloads_file():
-    if not os.path.exists(DOWNLOADS_FILE):
+    if not os.path.exists(ACTIVE_DOWNLOADS_FILE):
         return {}
     try:
-        with open(DOWNLOADS_FILE, 'r') as f:
+        with open(ACTIVE_DOWNLOADS_FILE, 'r') as f:
             return json.load(f)
     except:
         return {}
 
 def save_downloads_file(data):
     try:
-        with open(DOWNLOADS_FILE, 'w') as f:
+        with open(ACTIVE_DOWNLOADS_FILE, 'w') as f:
             json.dump(data, f)
     except Exception as e:
         logging.error(f"Error saving downloads file: {e}")
@@ -378,6 +488,35 @@ def remove_active_download(task_id):
     if task_id in data:
         del data[task_id]
         save_downloads_file(data)
+
+@bp.route('/downloads', methods=['GET'])
+def get_active_downloads():
+    """Get list of active downloads."""
+    data = load_downloads_file()
+    tasks = []
+    
+    # Check status of each task
+    for task_id, info in data.items():
+        res = AsyncResult(task_id, app=celery_app)
+        
+        # Start with stored info
+        task_info = info.copy()
+        
+        if res.state == 'PROGRESS':
+             meta = res.info or {}
+             if isinstance(meta, dict):
+                 task_info['status'] = meta.get('status', 'downloading')
+                 task_info['progress'] = meta.get('progress', 0)
+        elif res.state == 'SUCCESS':
+            task_info['status'] = 'completed'
+            task_info['progress'] = 100
+        elif res.state == 'FAILURE':
+            task_info['status'] = 'failed'
+            task_info['error'] = str(res.info)
+            
+        tasks.append(task_info)
+        
+    return jsonify({"tasks": tasks})
 
 @bp.route('/pull', methods=['POST'])
 def pull_model():
@@ -540,65 +679,170 @@ import json
 
 @bp.route('/hardware', methods=['GET'])
 def get_hardware_info():
-    """Get system hardware info (RAM)."""
+    """Get system hardware info (RAM & VRAM)."""
+    import subprocess
+    
+    info = {
+        "ram_total": 0,
+        "ram_available": 0,
+        "vram_total": 0,
+        "vram_available": 0,
+        "gpu_name": None
+    }
+    
     try:
+        # RAM
         mem = psutil.virtual_memory()
-        return jsonify({
-            "ram_total": mem.total,
-            "ram_available": mem.available,
-            "ram_percent": mem.percent
-        })
+        info["ram_total"] = mem.total
+        info["ram_available"] = mem.available
+        
+        # VRAM (NVIDIA)
+        try:
+            # Check for nvidia-smi
+            result = subprocess.run(
+                ['nvidia-smi', '--query-gpu=name,memory.total,memory.free', '--format=csv,noheader,nounits'], 
+                capture_output=True, text=True, timeout=2
+            )
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')
+                if lines:
+                    # Take first GPU
+                    parts = lines[0].split(',')
+                    if len(parts) >= 3:
+                        info['gpu_name'] = parts[0].strip()
+                        # Convert MB to Bytes for consistency with psutil
+                        info['vram_total'] = int(parts[1].strip()) * 1024 * 1024
+                        info['vram_available'] = int(parts[2].strip()) * 1024 * 1024
+        except Exception:
+            pass # No GPU or error checking
+            
+        return jsonify(info)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @bp.route('/import/scan', methods=['GET'])
 def scan_imports():
-    """Scan import directory for GGUF files."""
+    """Scan models directory for GGUF files."""
     try:
-        # Path inside APP container
-        import_dir = "/app/ollama_import" 
-        if not os.path.exists(import_dir):
+        # Path inside APP container - using new models/ folder
+        models_dir = "/app/models"
+        if not os.path.exists(models_dir):
             return jsonify({"files": []})
-            
-        files = [f for f in os.listdir(import_dir) if f.endswith('.gguf')]
+
+        files = [f for f in os.listdir(models_dir) if f.endswith('.gguf')]
         return jsonify({"files": files})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@bp.route('/import/upload', methods=['POST'])
+def upload_gguf():
+    """Upload a GGUF model file."""
+    try:
+        models_dir = "/app/models"
+        if not os.path.exists(models_dir):
+            os.makedirs(models_dir)
+            
+        if 'file' not in request.files:
+            return jsonify({"error": "No file part"}), 400
+            
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No selected file"}), 400
+            
+        if not file.filename.lower().endswith('.gguf'):
+            return jsonify({"error": "Only .gguf files are allowed"}), 400
+
+        filename = os.path.basename(file.filename) # sanitize?
+        save_path = os.path.join(models_dir, filename)
+        
+        # Save file (chunked to avoid memory issues)
+        file.save(save_path) # Flask's save uses shutil.copyfileobj which is efficient
+        
+        return jsonify({"success": True, "filename": filename})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @bp.route('/import', methods=['POST'])
 def import_model():
-    """Import a GGUF model."""
+    """
+    Import a GGUF model for llama.cpp.
+    Note: For llama.cpp, models just need to exist in /models directory - no import step needed.
+    This endpoint now simply verifies the file exists and is valid.
+    """
     data = request.json
     filename = data.get('filename')
-    model_name = data.get('model_name') # User defined name
-    
+    model_name = data.get('model_name') # User defined name (for UI purposes)
+
     if not filename or not model_name:
         return jsonify({"error": "Filename and Model Name required"}), 400
+
+    try:
+        # For llama.cpp: Just verify the GGUF file exists in the models directory
+        models_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'models')
+        file_path = os.path.join(models_dir, filename)
+
+        if not os.path.exists(file_path):
+            return jsonify({"error": f"GGUF file not found: {filename}"}), 404
+
+        if not filename.lower().endswith('.gguf'):
+            return jsonify({"error": "File must be a .gguf file"}), 400
+
+        # Get file info
+        file_size = os.path.getsize(file_path)
+        size_gb = round(file_size / (1024**3), 2)
+
+        # For llama.cpp, the model is ready to use immediately
+        # The server will load it when selected via the model selector
+        return jsonify({
+            "success": True,
+            "details": f"Model {filename} ({size_gb} GB) is ready for llama.cpp. Select it from the model list to use it.",
+            "filename": filename,
+            "size_gb": size_gb,
+            "path": f"/models/{filename}"
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@bp.route('/models/lookup', methods=['POST'])
+def lookup_models():
+    """Fetch available models from a provider using provided credentials."""
+    data = request.json
+    provider = data.get('provider')
+    api_key = data.get('api_key')
+    
+    if not provider or not api_key:
+        return jsonify({"error": "Provider and API Key required"}), 400
         
     try:
-        base_url = settings.OLLAMA_BASE_URL.replace("/v1", "")
+        if provider == 'groq':
+            url = "https://api.groq.com/openai/v1/models"
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            resp = requests.get(url, headers=headers, timeout=10)
+            resp.raise_for_status()
+            
+            data = resp.json()
+            # Groq returns standard OpenAI format: {"data": [{"id": "...", ...}]}
+            models = []
+            for m in data.get('data', []):
+                model_id = m.get('id')
+                if model_id:
+                     # Detect vision capability 
+                     # (Groq currently labels vision models with 'vision' in ID sometimes, or we check known ones)
+                     is_vision = 'vision' in model_id.lower() or 'llava' in model_id.lower() \
+                                 or 'scout' in model_id.lower() or 'maverick' in model_id.lower()
+                     models.append({
+                         "name": model_id,
+                         "vision": is_vision
+                     })
+            
+            return jsonify({"models": models})
+            
+        return jsonify({"error": f"Provider {provider} lookup not supported"}), 400
         
-        # 1. We tell Ollama to create a model from this file.
-        # The file is at /root/.ollama/import/{filename} inside OLLAMA container.
-        # (Assuming we matched the volume mounts correctly)
-        
-        modelfile_content = f"FROM /root/.ollama/import/{filename}"
-        
-        payload = {
-            "name": model_name,
-            "modelfile": modelfile_content
-        }
-        
-        # Stream the creation process
-        def generate():
-            with requests.post(f"{base_url}/api/create", json=payload, stream=True, timeout=300) as r:
-                r.raise_for_status()
-                for chunk in r.iter_content(chunk_size=8192):
-                    if chunk:
-                        yield chunk
-
-        return generate(), {"Content-Type": "application/json"}
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -661,7 +905,7 @@ def set_current_model():
         # For now just save model.
         db.session.commit()
     except Exception as e:
-        print(f"Error persisting model selection: {e}")
+        pass
         
     return jsonify({
         "success": True,
@@ -682,8 +926,8 @@ def get_chat_settings():
             "use_conversation_context": True,
             "max_context_messages": 10,
             "selected_system_prompt_id": None,
-            "chunk_size": 512,
-            "chunk_overlap": 50,
+            "chunk_size": 1024,
+            "chunk_overlap": 100,
             "whisper_model": "base"
         })
 
@@ -701,7 +945,28 @@ def get_chat_settings():
         "custom_api_key": prefs.custom_api_key or "",
         "local_llm_base_url": prefs.local_llm_base_url or "http://host.docker.internal:1234/v1",
         "transcription_provider": getattr(prefs, 'transcription_provider', 'local'),
-        "selected_llm_model": prefs.selected_llm_model or ""
+        "selected_llm_model": prefs.selected_llm_model or "",
+        "memory_enabled": getattr(prefs, 'memory_enabled', False),
+        "memory_provider": getattr(prefs, 'memory_provider', 'ollama'),
+        "memory_llm_model": getattr(prefs, 'memory_llm_model', 'llama3:8b'),
+        "max_memories": getattr(prefs, 'max_memories', 50),
+        "active_connection_id": str(prefs.active_connection_id) if prefs.active_connection_id else None,
+        "web_search_provider": getattr(prefs, 'web_search_provider', 'duckduckgo'),
+        "tavily_api_key": getattr(prefs, 'tavily_api_key', ''),
+        "brave_search_api_key": getattr(prefs, 'brave_search_api_key', ''),
+        "deepgram_api_key": getattr(prefs, 'deepgram_api_key', ''),
+        "tts_provider": getattr(prefs, 'tts_provider', 'browser'),
+        "stt_provider": getattr(prefs, 'stt_provider', 'browser'),
+        "tts_voice": getattr(prefs, 'tts_voice', None),
+        "tts_enabled": getattr(prefs, 'tts_enabled', False),
+        "openai_tts_model": getattr(prefs, 'openai_tts_model', 'tts-1'),
+        "openai_stt_model": getattr(prefs, 'openai_stt_model', 'whisper-1'),
+        "ollama_num_ctx": getattr(prefs, 'ollama_num_ctx', 2048),
+        "llm_max_tokens": getattr(prefs, 'llm_max_tokens', 4096),
+        "llm_temperature": getattr(prefs, 'llm_temperature', 0.7),
+        "llm_top_p": getattr(prefs, 'llm_top_p', 0.9),
+        "llm_frequency_penalty": getattr(prefs, 'llm_frequency_penalty', 0.3),
+        "llm_presence_penalty": getattr(prefs, 'llm_presence_penalty', 0.1)
     })
 
 
@@ -748,9 +1013,26 @@ def save_chat_settings():
         if model in valid_models:
             prefs.whisper_model = model
 
+    # Memory Config
+    if 'memory_enabled' in data:
+        prefs.memory_enabled = data['memory_enabled']
+    if 'memory_provider' in data:
+        prefs.memory_provider = data['memory_provider']
+    if 'memory_llm_model' in data:
+        if data['memory_llm_model']: # Only update if not empty, similar to selected_llm_model
+            prefs.memory_llm_model = data['memory_llm_model']
+    if 'max_memories' in data:
+        prefs.max_memories = int(data['max_memories'])
+
     # LLM Config
     if 'llm_provider' in data:
-        prefs.llm_provider = data['llm_provider']
+        # Normalize provider string
+        provider = data['llm_provider']
+        if provider:
+             prefs.llm_provider = provider
+             # Explicitly set active model based on provider defaults if not set?
+             # No, let the UI handle that or fallback logic in LLMClient.
+    
     if 'openai_api_key' in data:
         prefs.openai_api_key = data['openai_api_key']
     if 'anthropic_api_key' in data:
@@ -761,6 +1043,11 @@ def save_chat_settings():
         prefs.groq_api_key = data['groq_api_key']
     if 'custom_api_key' in data:
         prefs.custom_api_key = data['custom_api_key']
+    
+    if 'active_connection_id' in data:
+        # data['active_connection_id'] can be None or a UUID string
+        val = data['active_connection_id']
+        prefs.active_connection_id = val if val else None
     
     if 'selected_llm_model' in data:
         new_model = data['selected_llm_model']
@@ -778,6 +1065,46 @@ def save_chat_settings():
             # Also update the ModelManager singleton to reflect immediate change
             from app.services.model_manager import model_manager
             model_manager.set_model(new_model)
+
+    # Web Search Config
+    if 'web_search_provider' in data:
+        prefs.web_search_provider = data['web_search_provider']
+    if 'tavily_api_key' in data:
+        prefs.tavily_api_key = data['tavily_api_key']
+    if 'brave_search_api_key' in data:
+        prefs.brave_search_api_key = data['brave_search_api_key']
+    if 'deepgram_api_key' in data:
+        prefs.deepgram_api_key = data['deepgram_api_key']
+
+    # Voice Config
+    if 'tts_provider' in data:
+        prefs.tts_provider = data['tts_provider']
+    if 'stt_provider' in data:
+        prefs.stt_provider = data['stt_provider']
+    if 'tts_voice' in data:
+        prefs.tts_voice = data['tts_voice']
+    if 'tts_enabled' in data:
+        prefs.tts_enabled = data['tts_enabled']
+    if 'openai_tts_model' in data:
+        prefs.openai_tts_model = data['openai_tts_model']
+    if 'openai_stt_model' in data:
+        prefs.openai_stt_model = data['openai_stt_model']
+
+    # LLM Generation Parameters
+    if 'llm_max_tokens' in data:
+        prefs.llm_max_tokens = int(data['llm_max_tokens'])
+    if 'llm_temperature' in data:
+        prefs.llm_temperature = float(data['llm_temperature'])
+    if 'llm_top_p' in data:
+        prefs.llm_top_p = float(data['llm_top_p'])
+    if 'llm_frequency_penalty' in data:
+        prefs.llm_frequency_penalty = float(data['llm_frequency_penalty'])
+    if 'llm_presence_penalty' in data:
+        prefs.llm_presence_penalty = float(data['llm_presence_penalty'])
+
+    # Ollama Context Window
+    if 'ollama_num_ctx' in data:
+        prefs.ollama_num_ctx = int(data['ollama_num_ctx'])
 
     prefs.updated_at = datetime.utcnow()
     db.session.commit()
@@ -870,3 +1197,34 @@ def delete_system_prompt(prompt_id):
     return jsonify({"success": True})
 
 
+
+@bp.route('/files/<path:repo_id>', methods=['GET'])
+def list_repo_files(repo_id):
+    """List GGUF files for a given HF repo."""
+    try:
+        files = HFDownloader.list_gguf_files(repo_id)
+        return jsonify({"files": files})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@bp.route('/pull_gguf', methods=['POST'])
+def pull_model_gguf():
+    """Trigger a direct GGUF download and import."""
+    data = request.json
+    repo_id = data.get('repo_id')
+    filename = data.get('filename')
+    model_name = data.get('model_name')
+    
+    if not all([repo_id, filename, model_name]):
+        return jsonify({"error": "Missing required fields: repo_id, filename, model_name"}), 400
+
+    task = download_gguf_task.delay(repo_id, filename, model_name)
+    
+    # Track it
+    add_active_download(task.id, model_name)
+    
+    return jsonify({
+        "status": "started",
+        "task_id": task.id,
+        "model": model_name
+    })

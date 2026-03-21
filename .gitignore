@@ -22,6 +22,11 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+uploads/
+models/*
+_nul
+
+app/static/audio/
 
 # Virtual Environment
 venv/
@@ -54,6 +59,7 @@ instance/
 *.db
 *.sqlite
 *.sqlite3
+migrations/
 
 # Docker volumes (data directories)
 postgres_data/
@@ -61,6 +67,9 @@ uploads_data/
 whisper_cache/
 redis_data/
 data/
+
+# Archive folder (persistent file storage)
+archive/
 
 # Ollama models (can be large)
 ollama_models/
@@ -194,3 +203,16 @@ yarn-error.log
 testem.log
 typing_definitions/
 active_downloads.json
+.agent/HyperGraphReasoning
+.agent/HyperGraphReasoning
+.agent/HyperGraphReasoning
+.claude/settings.local.json
+ARCHITECTURE_DIAGRAM.txt
+.gitignore
+llm_repetition_problem_explained.txt
+pdf_workflow_diagram.txt
+huggingface_requests_explained.txt
+nul
+.last_build
+.last_build_dev
+recent_files.txt

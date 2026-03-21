@@ -3,43 +3,63 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { SettingsService } from '@services/settings.service';
-import { ChatPreferences, SystemPrompt } from '@core/models';
-import { ProgressBarComponent } from '@shared/components/progress-bar/progress-bar.component';
+import { ToastrService } from 'ngx-toastr';
+import { AppRoutes } from '@core/constants/app-routes';
+
+import { PluginsSettingsComponent } from '../components/plugins-settings/plugins-settings.component';
+import { SettingsActiveDownloadsComponent } from '../components/settings-active-downloads/settings-active-downloads.component';
+import { SettingsModelsTabComponent } from '../components/settings-models-tab/settings-models-tab.component';
+import { SettingsDiscoverTabComponent } from '../components/settings-discover-tab/settings-discover-tab.component';
+import { SettingsManageTabComponent } from '../components/settings-manage-tab/settings-manage-tab.component';
+import { SettingsVoiceTabComponent } from '../components/settings-voice-tab/settings-voice-tab.component';
+import { SettingsChatTabComponent } from '../components/settings-chat-tab/settings-chat-tab.component';
 
 @Component({
     selector: 'app-settings-page',
     standalone: true,
-    imports: [CommonModule, RouterLink, FormsModule, ProgressBarComponent],
+    imports: [
+        CommonModule,
+        RouterLink,
+        FormsModule,
+        PluginsSettingsComponent,
+        SettingsActiveDownloadsComponent,
+        SettingsModelsTabComponent,
+        SettingsDiscoverTabComponent,
+        SettingsManageTabComponent,
+        SettingsVoiceTabComponent,
+        SettingsChatTabComponent
+    ],
     host: { class: 'flex flex-col h-full w-full' },
     templateUrl: './settings-page.component.html',
     styleUrl: './settings-page.component.css'
 })
 export class SettingsPage implements OnInit {
     settingsService = inject(SettingsService);
+    toastr = inject(ToastrService);
+    protected readonly AppRoutes = AppRoutes;
 
-    activeTab = signal<'models' | 'discover' | 'import' | 'chat'>('models');
+    activeTab = signal<'models' | 'discover' | 'manage' | 'chat' | 'voice' | 'plugins'>('models');
 
-    // Prompt Modal
-    isPromptModalOpen = signal<boolean>(false);
-    editingPromptId = signal<string | null>(null);
-    promptForm = signal<{ title: string, content: string }>({ title: '', content: '' });
+    ggufModels = signal<any[]>([]);
+    currentGgufModel = signal<string>('');
 
-    // Import State
     importFiles = signal<string[]>([]);
     importModelName = signal<string>('');
     selectedImportFile = signal<string>('');
 
-    // Discover State
     searchQuery = signal<string>('');
     searchResults = signal<any[]>([]);
     isSearching = signal<boolean>(false);
 
-    // Download State
     activeDownloads = signal<{ [key: string]: any }>({});
     activeDownloadsList = computed(() => Object.values(this.activeDownloads()));
     private pollInterval: any;
 
-    constructor() { }
+    isGgufModalOpen = signal<boolean>(false);
+    ggufFiles = signal<{ filename: string, size_mb: number, quantization: string }[]>([]);
+    loadingGgufFiles = signal<boolean>(false);
+    selectedRepoId = signal<string | null>(null);
+    hardwareInfo = signal<{ ram_available: number, vram_available: number, gpu_name: string | null } | null>(null);
 
     ngOnInit() {
         this.loadAllData();
@@ -51,34 +71,40 @@ export class SettingsPage implements OnInit {
     }
 
     async loadAllData() {
-        // Load models separately as it might fail if Ollama is down
-        try {
-            await this.settingsService.loadModels();
-        } catch (e) {
-            console.warn('Failed to load models (expected if Ollama is down)');
-        }
-
+        await this.loadGgufModels();
         await Promise.all([
-            this.settingsService.loadCurrentModel().catch(() => { }),
             this.settingsService.loadChatPreferences(),
             this.settingsService.loadSystemPrompts(),
-            this.checkOllamaStatus()
+            this.settingsService.loadMemories(),
+            this.settingsService.loadConnections()
         ]);
     }
 
+    async loadGgufModels() {
+        try {
+            const response = await this.settingsService.getLlamacppModels();
+            this.ggufModels.set(response.models);
+            const prefs = this.settingsService.chatPreferences();
+            if (prefs?.llm_provider === 'llamacpp' && prefs?.selected_llm_model) {
+                this.currentGgufModel.set(prefs.selected_llm_model);
+            }
+        } catch (e) {
+            console.error('Failed to load GGUF models:', e);
+        }
+    }
+
     async startDownloadPolling() {
-        this.pollDownloads(); // Initial check
+        this.pollDownloads();
         this.pollInterval = setInterval(() => this.pollDownloads(), 2000);
     }
 
     async pollDownloads() {
         try {
-            const activePulls = await this.settingsService.getActivePulls(); // Returns array of { task_id, model_name, ... }
+            const activePulls = await this.settingsService.getActivePulls();
 
             const currentDownloads = { ...this.activeDownloads() };
             let hasChanges = false;
 
-            // Update known downloads or add new ones
             let pullsArray: any[] = [];
             if (Array.isArray(activePulls)) {
                 pullsArray = activePulls;
@@ -87,21 +113,46 @@ export class SettingsPage implements OnInit {
             }
 
             for (const pull of pullsArray) {
-                // Fetch latest status/progress for this task
                 try {
-                    // Start with basic pull info
                     let merged = { ...pull };
+                    if (merged.progress_line && typeof merged.progress_line === 'string') {
+                        try {
+                            const progressData = JSON.parse(merged.progress_line);
+                            if (progressData.total && progressData.completed) {
+                                merged.total = progressData.total;
+                                merged.completed = progressData.completed;
+                                merged.progress = (merged.completed / merged.total) * 100;
+                            }
+                            if (progressData.status) {
+                                merged.status = progressData.status;
+                            }
+                        } catch (e) {
+                            console.warn("Failed to parse progress_line", e);
+                        }
+                    }
 
-                    // If backend return includes 'result' or 'error' in pull object (from my python changes), use it
-
-                    // Normalize Status for UI
-                    // If Celery says SUCCESS but result has error -> Error
                     if (merged.status === 'SUCCESS' && merged.result && merged.result.status === 'error') {
                         merged.status = 'failure';
                         merged.error = merged.result.error;
                     } else if (merged.status === 'SUCCESS') {
                         merged.status = 'success';
                         merged.progress = 100;
+
+                        if (!currentDownloads[pull.task_id]?.dismissScheduled) {
+                            merged.dismissScheduled = true;
+                            this.settingsService.loadModels();
+                            setTimeout(() => {
+                                const now = { ...this.activeDownloads() };
+                                if (now[pull.task_id] && now[pull.task_id].status === 'success') {
+                                    delete now[pull.task_id];
+                                    this.activeDownloads.set(now);
+                                    this.settingsService.deletePull(pull.task_id).catch(() => { });
+                                }
+                            }, 5000);
+                        } else {
+                            merged.dismissScheduled = true;
+                        }
+
                     } else if (merged.status === 'FAILURE') {
                         merged.status = 'failure';
                     }
@@ -113,20 +164,13 @@ export class SettingsPage implements OnInit {
                 }
             }
 
-            // Remove downloads that are no longer active (completed/failed and removed from backend list) (?)
-            // Actually backend keeps them in list if we implemented it that way?
-            // Let's assume backend list is the source of truth for "active"
-            // But we might want to keep "completed" ones visible for a bit? 
-            // For KISS, let's just sync with backend list.
-
-            // Filter out keys in currentDownloads that are not in activePulls
             const activeIds = new Set(pullsArray.map(p => p.task_id));
             Object.keys(currentDownloads).forEach(id => {
                 if (!activeIds.has(id)) {
-                    // If it was recently completed, maybe keep it?
-                    // For now, if it's gone from backend, remove it.
-                    delete currentDownloads[id];
-                    hasChanges = true;
+                    if (!currentDownloads[id].dismissScheduled) {
+                        delete currentDownloads[id];
+                        hasChanges = true;
+                    }
                 }
             });
 
@@ -134,48 +178,36 @@ export class SettingsPage implements OnInit {
                 this.activeDownloads.set(currentDownloads);
             }
 
-            // Specific fix: If we have active downloads that are NOT in the backend list anymore,
-            // it means the backend cleaned them up. We should update them to 'completed' or remove them.
-            // But if we just remove them, the user won't know they finished.
-            // Let's rely on getActivePulls returning even finished tasks as seen in previous backend code analysis.
-            // (Backend code: "if status in ['SUCCESS'...] ids_to_remove.append... else active_list.append")
-            // Wait, backend explicitly REMOVES success tasks from the returned list!
-            // That's bad for UI.
-            // Re-reading backend logic:
-            // "if status in ['SUCCESS', 'FAILURE', 'REVOKED']: ids_to_remove.append(task_id)"
-            // "if status in [...] active_list.append(...)" -> This is in the loop. 
-            // It appends to active_list in the `else` block? 
-            // Let me re-read backend code carefully.
-
         } catch (e) {
             console.error('Polling failed', e);
         }
     }
 
-    switchTab(tab: 'models' | 'discover' | 'import' | 'chat') {
+    switchTab(tab: 'models' | 'discover' | 'manage' | 'chat' | 'voice' | 'plugins') {
         this.activeTab.set(tab);
-        if (tab === 'import') {
+        if (tab === 'manage') {
             this.scanImports();
         } else if (tab === 'discover') {
-            // Only search if empty to encourage discovery but avoid re-fetch on every tab switch if not needed?
-            // User probably wants to see results if they return.
             if (this.searchResults().length === 0) {
                 this.searchLibrary();
             }
         }
     }
 
-    // Models
-    async handleDeleteModel(modelName: string) {
-        if (!confirm(`Are you sure you want to delete ${modelName}?`)) return;
-        await this.settingsService.deleteModel(modelName);
+    async handleSetCurrentGgufModel(filename: string) {
+        try {
+            await this.settingsService.saveChatPreferences({
+                llm_provider: 'llamacpp',
+                selected_llm_model: filename
+            });
+            this.currentGgufModel.set(filename);
+            this.toastr.success(`Model set to ${filename}`);
+        } catch (e) {
+            console.error('Failed to set GGUF model:', e);
+            this.toastr.error('Failed to set model');
+        }
     }
 
-    async handleSetCurrentModel(modelName: string) {
-        await this.settingsService.setCurrentModel(modelName);
-    }
-
-    // Discover
     async searchLibrary() {
         this.isSearching.set(true);
         try {
@@ -191,36 +223,98 @@ export class SettingsPage implements OnInit {
     async handlePullModel(modelName: string) {
         try {
             const res = await this.settingsService.pullModel({ model: modelName });
-            // Add to local state immediately to show feedback
             this.activeDownloads.update(d => ({
                 ...d,
                 [res.task_id]: { task_id: res.task_id, model: modelName, status: 'starting', progress: 0 }
             }));
-            alert(`Started pulling ${modelName}`);
+            this.toastr.info(`Started pulling ${modelName}`);
         } catch (err) {
-            alert('Failed to start pull');
+            this.toastr.error('Failed to start pull');
         }
     }
 
-    // Import
     async scanImports() {
         const files = await this.settingsService.scanImports();
         this.importFiles.set(files);
         if (files.length > 0) {
-            this.selectedImportFile.set(files[0]);
+            this.selectImportFile(files[0]);
         }
     }
 
-    async handleImportModel() {
-        if (!this.selectedImportFile() || !this.importModelName()) return;
+    selectImportFile(file: string) {
+        this.selectedImportFile.set(file);
+        const name = file.replace(/\.gguf$/i, '').toLowerCase();
+        this.importModelName.set(name);
+    }
+
+    getImportStatus(filename: string): { text: string, class: string } {
+        const basename = filename.toLowerCase().replace('.gguf', '');
+        const models = this.settingsService.models()?.models || [];
+        const exists = models.some(m => {
+            const mName = m.name.toLowerCase();
+            const mBase = mName.split(':')[0];
+            return mName.includes(basename) || basename.includes(mBase);
+        });
+
+        if (exists) {
+            return { text: 'Already imported (Ready to use)', class: 'text-success' };
+        }
+        return { text: 'Ready to import', class: 'text-secondary' };
+    }
+
+    async handleFileUpload(event: Event) {
+        const input = event.target as HTMLInputElement;
+        if (!input.files || input.files.length === 0) return;
+
+        const file = input.files[0];
+        if (!file.name.toLowerCase().endsWith('.gguf')) {
+            this.toastr.error('Only .gguf files are allowed', 'Invalid File');
+            return;
+        }
+
+        const taskId = `upload-${Date.now()}`;
+        this.activeDownloads.update(d => ({
+            ...d,
+            [taskId]: {
+                task_id: taskId,
+                model: file.name,
+                status: 'uploading',
+                progress: 0,
+                is_import: true
+            }
+        }));
+
+        this.toastr.info(`Uploading ${file.name}...`, 'Upload Started');
 
         try {
-            await this.settingsService.importModel(this.selectedImportFile(), this.importModelName());
-            alert('Import started/completed');
-            this.importModelName.set('');
-            this.switchTab('models');
-        } catch (err) {
-            alert('Import failed');
+            const res = await this.settingsService.uploadModel(file);
+            if (res.success) {
+                this.toastr.success('File uploaded successfully', 'Upload Complete');
+                await this.scanImports();
+                this.selectImportFile(res.filename);
+
+                this.activeDownloads.update(d => ({
+                    ...d,
+                    [taskId]: { ...d[taskId], status: 'success', progress: 100, dismissScheduled: true }
+                }));
+
+                setTimeout(() => {
+                    this.activeDownloads.update(d => {
+                        const next = { ...d };
+                        delete next[taskId];
+                        return next;
+                    });
+                }, 5000);
+            }
+        } catch (error) {
+            console.error(error);
+            this.toastr.error('Failed to upload file', 'Upload Failed');
+            this.activeDownloads.update(d => ({
+                ...d,
+                [taskId]: { ...d[taskId], status: 'failure' }
+            }));
+        } finally {
+            input.value = '';
         }
     }
 
@@ -229,126 +323,57 @@ export class SettingsPage implements OnInit {
 
         try {
             await this.settingsService.deletePull(taskId);
-            // Optimistic update
             const current = { ...this.activeDownloads() };
             delete current[taskId];
             this.activeDownloads.set(current);
         } catch (error) {
             console.error('Failed to delete task', error);
-            window.alert('Failed to delete task. Check console.');
+            this.toastr.error('Failed to delete task. Check console.');
         }
     }
 
-    // Chat Preferences
-    async handleSaveChatPreferences() {
-        const prefs = this.settingsService.chatPreferences();
-        if (prefs) {
-            await this.settingsService.saveChatPreferences(prefs);
-            alert('Settings saved');
-        }
-    }
+    async openGgufModal(repoId: string) {
+        this.selectedRepoId.set(repoId);
+        this.ggufFiles.set([]);
+        this.loadingGgufFiles.set(true);
+        this.isGgufModalOpen.set(true);
+        this.hardwareInfo.set(null);
 
-    // Ollama Service State
-    ollamaStatus = signal<{ status: string; id?: string }>({ status: 'unknown' });
-    ollamaInstallProgress = signal<{ status: string; progress?: number; message?: string } | null>(null);
-
-    async checkOllamaStatus() {
         try {
-            const status = await this.settingsService.getOllamaStatus();
-            this.ollamaStatus.set(status);
-        } catch (e) {
-            console.error('Failed to check Ollama status', e);
-            this.ollamaStatus.set({ status: 'error' });
+            const [files, hw] = await Promise.all([
+                this.settingsService.listRepoFiles(repoId),
+                this.settingsService.getHardwareInfo()
+            ]);
+            this.ggufFiles.set(files);
+            this.hardwareInfo.set(hw);
+        } catch (error) {
+            this.toastr.error('Failed to load file list from Hugging Face');
+            this.closeGgufModal();
+        } finally {
+            this.loadingGgufFiles.set(false);
         }
     }
 
-    async handleStartOllamaService() {
+    closeGgufModal() {
+        this.isGgufModalOpen.set(false);
+        this.selectedRepoId.set(null);
+    }
+
+    async handlePullGguf(file: any) {
+        const repo = this.selectedRepoId();
+        if (!repo) return;
+
+        const shortName = repo.split('/').pop()?.toLowerCase() || 'model';
+        const modelName = `${shortName}-${file.quantization.toLowerCase()}`;
+
+        if (!confirm(`Download ${file.filename} (${file.size_mb.toFixed(0)} MB) as "${modelName}"?`)) return;
+
         try {
-            this.ollamaInstallProgress.set({ status: 'starting', message: 'Starting Ollama service...' });
-            const res = await this.settingsService.startOllamaService();
-            this.ollamaStatus.set(res);
-            this.ollamaInstallProgress.set(null);
-            setTimeout(() => this.loadAllData(), 2000); // Reload models after start
-        } catch (e) {
-            console.error(e);
-            this.ollamaInstallProgress.set({ status: 'error', message: 'Failed to start service' });
+            await this.settingsService.pullModelGguf(repo, file.filename, modelName);
+            this.toastr.success(`Download started for ${modelName}`, 'Download Queued');
+            this.closeGgufModal();
+        } catch (error) {
+            this.toastr.error('Failed to start download');
         }
-    }
-
-    async handleInstallOllamaService() {
-        this.ollamaInstallProgress.set({ status: 'starting', message: 'Initializing download...' });
-
-        this.settingsService.installOllamaService().subscribe({
-            next: (event: any) => {
-                if (event.type === 3) { // HttpEventType.DownloadProgress is 3 (partial text)
-                    // Angular handles streaming text weirdly in default HttpClient events
-                    // We simplified backend to send NDJSON
-                    const partialText = event.partialText;
-                    if (partialText) {
-                        const lines = partialText.split('\n').filter((l: string) => l.trim());
-                        const lastLine = lines[lines.length - 1];
-                        try {
-                            const data = JSON.parse(lastLine);
-                            this.updateInstallProgress(data);
-                        } catch (e) { /* ignore parse error for partial chunks */ }
-                    }
-                }
-                else if (typeof event === 'string') {
-                    // Sometimes it comes as string if we used certain responseType settings, 
-                    // but here we used observe: 'events'
-                }
-            },
-            complete: () => {
-                this.ollamaInstallProgress.set(null);
-                this.checkOllamaStatus();
-            },
-            error: (err) => {
-                this.ollamaInstallProgress.set({ status: 'error', message: 'Installation failed' });
-                console.error(err);
-            }
-        });
-    }
-
-    updateInstallProgress(data: any) {
-        if (data.status) {
-            this.ollamaInstallProgress.set({
-                status: 'downloading',
-                message: data.status,
-                progress: data.progressDetail?.current ? (data.progressDetail.current / data.progressDetail.total * 100) : 0
-            });
-        }
-    }
-
-    // Prompts
-    openPromptModal(prompt?: SystemPrompt) {
-        if (prompt) {
-            this.editingPromptId.set(prompt.id);
-            this.promptForm.set({ title: prompt.title, content: prompt.content });
-        } else {
-            this.editingPromptId.set(null);
-            this.promptForm.set({ title: '', content: '' });
-        }
-        this.isPromptModalOpen.set(true);
-    }
-
-    closePromptModal() {
-        this.isPromptModalOpen.set(false);
-    }
-
-    async handleSavePrompt() {
-        const { title, content } = this.promptForm();
-        if (!title || !content) return;
-
-        if (this.editingPromptId()) {
-            await this.settingsService.updateSystemPrompt(this.editingPromptId()!, { title, content });
-        } else {
-            await this.settingsService.createSystemPrompt(title, content);
-        }
-        this.closePromptModal();
-    }
-
-    async handleDeletePrompt(id: string) {
-        if (!confirm('Delete this prompt?')) return;
-        await this.settingsService.deleteSystemPrompt(id);
     }
 }

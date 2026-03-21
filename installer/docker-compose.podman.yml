@@ -1,0 +1,160 @@
+services:
+  frontend:
+    build: ./frontend_spa
+    ports:
+      - "5200:80"
+    depends_on:
+      - app
+
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - RUN_MIGRATIONS=true
+      - DATABASE_URL=postgresql://mnemos_user:mnemos_pass@db:5432/mnemos_db
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONUNBUFFERED=1
+      - OLLAMA_NUM_CTX=2048
+      - EMBEDDING_PROVIDER=local
+      - EMBEDDING_DEVICE=cuda
+      - EMBEDDING_MODEL=BAAI/bge-m3
+      - EMBEDDING_DIMENSION=1024
+      - HOST_PROJECT_PATH=${HOST_PROJECT_PATH:-.}
+    volumes:
+      - ./app:/app/app:rw
+      - ./config:/app/config:rw
+      - ./.env:/app/.env:ro
+      - ./migrations:/app/migrations:rw
+      - ./ollama_models/import:/app/ollama_import:rw
+      - uploads_data:/app/uploads
+      - whisper_cache:/root/.cache/whisper
+      - hf_cache:/root/.cache/huggingface
+      # Podman socket instead of Docker socket
+      - /run/podman/podman.sock:/var/run/docker.sock
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    # Podman GPU access (requires WSL2 + NVIDIA Container Toolkit)
+    devices:
+      - nvidia.com/gpu=all
+    security_opt:
+      - label=disable
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  worker:
+    build: .
+    command: celery -A app.celery_app worker --loglevel=info --pool=solo
+    environment:
+      - DATABASE_URL=postgresql://mnemos_user:mnemos_pass@db:5432/mnemos_db
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONUNBUFFERED=1
+      - OLLAMA_NUM_CTX=2048
+      - EMBEDDING_PROVIDER=local
+      - EMBEDDING_DEVICE=cuda
+      - EMBEDDING_MODEL=BAAI/bge-m3
+      - EMBEDDING_DIMENSION=1024
+      - HOST_PROJECT_PATH=${HOST_PROJECT_PATH:-.}
+    volumes:
+      - ./app:/app/app:rw
+      - ./config:/app/config:rw
+      - ./.env:/app/.env:ro
+      - uploads_data:/app/uploads
+      - whisper_cache:/root/.cache/whisper
+      - hf_cache:/root/.cache/huggingface
+      - ./ollama_models/import:/app/ollama_import:rw
+      - /run/podman/podman.sock:/var/run/docker.sock
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    devices:
+      - nvidia.com/gpu=all
+    security_opt:
+      - label=disable
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+      - ./ollama_models/import:/root/.ollama/import
+    devices:
+      - nvidia.com/gpu=all
+    security_opt:
+      - label=disable
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_GPU_LAYERS=-1
+      - CUDA_VISIBLE_DEVICES=0
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_NUM_CTX=2048
+    restart: unless-stopped
+
+  mcp:
+    build: .
+    command: python -m app.mcp_server.server run --transport sse --port 3000 --host 0.0.0.0
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://mnemos_user:mnemos_pass@db:5432/mnemos_db
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app:rw
+      - ./config:/app/config:rw
+
+  db:
+    image: pgvector/pgvector:pg16
+    command: >
+      postgres  -c shared_buffers=512MB  -c work_mem=32MB  -c maintenance_work_mem=256MB
+    environment:
+      - POSTGRES_USER=mnemos_user
+      - POSTGRES_PASSWORD=mnemos_pass
+      - POSTGRES_DB=mnemos_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U mnemos_user -d mnemos_db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: [ "redis-server", "--appendonly", "yes" ]
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=db
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
+  uploads_data:
+  whisper_cache:
+  redis_data:
+  hf_cache:
+  ollama_models:

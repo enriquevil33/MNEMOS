@@ -19,11 +19,13 @@ def chat():
         question = data.get('question')
         doc_ids = data.get('document_ids', [])
         conversation_id = data.get('conversation_id')
+        images = data.get('images', []) # List of base64 strings
     else:
         question = request.form.get('question')
         doc_ids_str = request.form.get('document_ids', '')
         doc_ids = [d.strip() for d in doc_ids_str.split(',') if d.strip()]
         conversation_id = request.form.get('conversation_id')
+        images = [] # Form data support for images could be added via file keys, but for now assuming JSON mostly or empty
 
     if not question:
         return jsonify({"error": "Question required"}), 400
@@ -31,7 +33,6 @@ def chat():
     # Load user preferences
     prefs = db.session.query(UserPreferences).first()
     if not prefs:
-        # Create default preferences if none exist
         prefs = UserPreferences(
             use_conversation_context=True,
             max_context_messages=10
@@ -46,17 +47,16 @@ def chat():
         if not conversation:
             return jsonify({"error": "Conversation not found"}), 404
     else:
-        # Create new conversation
         title = question[:40] + "..." if len(question) > 40 else question
         conversation = Conversation(title=title)
         db.session.add(conversation)
         db.session.commit()
 
-    # Save User Message
     user_msg = Message(
         conversation_id=conversation.id,
         role='user',
-        content=question
+        content=question,
+        images=images # Save images to simple DB column (JSONB)
     )
     db.session.add(user_msg)
     db.session.commit()
@@ -82,30 +82,48 @@ def chat():
             system_prompt = prompt_obj.content
 
     web_search = data.get('web_search', False) if request.is_json else False
+    use_graph_rag = data.get('use_graph_rag', False) if request.is_json else False
 
     # Perform RAG with conversation context
     rag = RAGService(db.session)
     result = rag.query(
         question=question,
         document_ids=doc_ids,
-        top_k=5,
+        top_k=10,
         conversation_history=conversation_history,
         system_prompt=system_prompt,
-        web_search=web_search
+        web_search=web_search,
+        use_graph_rag=use_graph_rag,
+        images=images
     )
 
-    # Save Assistant Message
     assistant_msg = Message(
         conversation_id=conversation.id,
         role='assistant',
         content=result["answer"],
-        sources=result["sources"]
+        sources=result["sources"],
+        search_queries=result.get("search_queries", [])
     )
     db.session.add(assistant_msg)
 
-    # Update conversation timestamp
     conversation.updated_at = db.func.now()
     db.session.commit()
+
+    # Trigger Memory Extraction (Async)
+    if prefs.memory_enabled:
+        try:
+            from app.tasks.memory_tasks import extract_memories_task
+            
+            # Prepare context: history + new exchange
+            # Note: conversation_history was reversed earlier to be chronological logic, but let's verify.
+            # Line 76: conversation_history = list(reversed(history_msgs)) -> So it IS chronological (oldest to newest).
+            
+            all_msgs = conversation_history + [user_msg, assistant_msg]
+            msgs_dicts = [{'role': m.role, 'content': m.content} for m in all_msgs]
+            
+            extract_memories_task.delay(msgs_dicts)
+        except Exception as e:
+            logger.error(f"Failed to trigger memory task: {e}")
 
     if request.headers.get('HX-Request'):
         return render_template(

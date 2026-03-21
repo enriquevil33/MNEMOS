@@ -11,9 +11,12 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   sources?: MessageSource[];
+  images?: string[];
+  audio_path?: string;
   created_at: string;
   status?: 'generating' | 'completed' | 'error';
   search_queries?: string[];
+  graph_data?: any;
 }
 
 export interface MessageSource {

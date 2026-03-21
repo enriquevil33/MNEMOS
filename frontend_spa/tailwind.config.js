@@ -27,12 +27,5 @@ module.exports = {
             }
         },
     },
-    plugins: [
-        require('daisyui'),
-    ],
-    daisyui: {
-        themes: [], // Empty array = no DaisyUI themes, we use our own CSS variables
-        base: false, // Disable DaisyUI base styles
-        styled: false, // Disable DaisyUI styled components
-    },
+    plugins: [],
 }

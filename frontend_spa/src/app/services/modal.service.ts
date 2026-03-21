@@ -6,7 +6,7 @@ import { Document } from '@core/models';
 })
 export class ModalService {
     isUploadOpen = signal(false);
-    isModelSelectionOpen = signal(false);
+
 
     // Upload Modal
     openUpload() {
@@ -17,13 +17,15 @@ export class ModalService {
         this.isUploadOpen.set(false);
     }
 
-    // Model Selection Modal
-    openModelSelection() {
-        this.isModelSelectionOpen.set(true);
+    // Processing Monitor Modal
+    isProcessingMonitorOpen = signal(false);
+
+    openProcessingMonitor() {
+        this.isProcessingMonitorOpen.set(true);
     }
 
-    closeModelSelection() {
-        this.isModelSelectionOpen.set(false);
+    closeProcessingMonitor() {
+        this.isProcessingMonitorOpen.set(false);
     }
 
     // PDF Viewer Modal
@@ -78,5 +80,43 @@ export class ModalService {
         this.isVideoPlayerOpen.set(false);
         this.videoUrl.set(null);
         this.videoTimestamp.set(undefined);
+    }
+    // Image Viewer Modal
+    isImageViewerOpen = signal(false);
+    images = signal<string[]>([]);
+    currentImageIndex = signal<number>(0);
+
+    // Computed or Helper to get current
+    get currentImageUrl(): string | null {
+        const imgs = this.images();
+        const idx = this.currentImageIndex();
+        if (imgs.length > 0 && idx >= 0 && idx < imgs.length) {
+            return imgs[idx];
+        }
+        return null;
+    }
+
+    openImageViewer(index: number, images: string[]) {
+        this.images.set(images);
+        this.currentImageIndex.set(index);
+        this.isImageViewerOpen.set(true);
+    }
+
+    closeImageViewer() {
+        this.isImageViewerOpen.set(false);
+        this.images.set([]);
+        this.currentImageIndex.set(0);
+    }
+
+    nextImage() {
+        const len = this.images().length;
+        if (len <= 1) return;
+        this.currentImageIndex.update(i => (i + 1) % len);
+    }
+
+    prevImage() {
+        const len = this.images().length;
+        if (len <= 1) return;
+        this.currentImageIndex.update(i => (i - 1 + len) % len);
     }
 }

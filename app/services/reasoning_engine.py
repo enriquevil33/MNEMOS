@@ -1,0 +1,313 @@
+from app.extensions import db
+from app.models.knowledge_graph import Concept, HyperEdge, HyperEdgeMember
+from app.services.llm_client import get_llm_client
+from collections import defaultdict, deque
+from sqlalchemy.orm import joinedload
+from uuid import UUID
+import logging
+
+logger = logging.getLogger(__name__)
+
+class ReasoningEngine:
+    
+    def __init__(self):
+        # Force reload to ensure we pick up latest settings (Provider changes)
+        from app.services.llm_client import reset_client, get_llm_client
+        reset_client()
+        self.llm = get_llm_client()
+
+    def _find_concept(self, name: str):
+        """Find concept by exact match or fuzzy vector search."""
+        from app.services.embedder import EmbedderService
+        
+        # 1. Exact Match
+        concept = db.session.query(Concept).filter_by(name=name).first()
+        if concept:
+            return concept
+            
+        # 2. Fuzzy Match
+        try:
+            embedder = EmbedderService()
+            query_vec = embedder.embed([name])[0]
+            
+            # Find closest within reasonable distance (e.g. 0.3)
+            # 0.3 cosine distance ~ 0.7 similarity
+            closest = db.session.query(Concept).order_by(
+                Concept.embedding.cosine_distance(query_vec)
+            ).limit(1).first()
+            
+            if closest:
+                # Check distance
+                dist = db.session.query(
+                    Concept.embedding.cosine_distance(query_vec)
+                ).filter(Concept.id == closest.id).scalar()
+                
+                # If distance is too far, maybe don't return? 
+                # For "Reasoning", user usually wants the BEST guess.
+                # Let's be lenient but log it.
+                if dist < 0.4:
+                    logger.info(f"Reasoning Fuzzy Match: '{name}' -> '{closest.name}' (dist: {dist:.3f})")
+                    return closest
+        except Exception as e:
+            logger.error(f"Vector search failed: {e}")
+            
+        return None
+
+    def traverse(self, start_concept_name: str, goal_concept_name: str, max_depth=3, k_paths=3, intersection_size=1, collection_ids=None, use_semantic_leap=False):
+        """
+        Traverse the Hypergraph from start_concept to goal_concept using BFS on HyperEdges.
+        Returns a narrative explanation of the connections found.
+        collection_ids: Optional list of UUID strings to filter edges by source document collection.
+        use_semantic_leap: If True, uses vector similarity to jump to related concepts ("bridges") if they aren't directly connected.
+        """
+        start_concept_name = start_concept_name.lower().strip()
+        goal_concept_name = goal_concept_name.lower().strip()
+        
+        # 1. Resolve Concepts (Exact -> Fuzzy)
+        start_node = self._find_concept(start_concept_name)
+        goal_node = self._find_concept(goal_concept_name)
+        
+        if not start_node:
+            return f"Starting concept '{start_concept_name}' not found (and no close matches)."
+        if not goal_node:
+            return f"Goal concept '{goal_concept_name}' not found (and no close matches)."
+            
+        logger.info(f"Starting traversal from {start_node.name} to {goal_node.name}. Semantic Leap: {use_semantic_leap}")
+
+        # 2. Build Local Inverted Index (Optimization: Load only relevant neighborhood if possible, 
+        # but for now we load members for simplicity or we do iterative SQL queries.
+        # Iterative SQL is better for scale than loading whole graph in RAM.
+        
+        # We will do a hybrid: iterative expansion.
+        
+        # BFS State
+        # Queue: (current_hyper_edge_id, path_of_edges)
+        queue = deque()
+        
+        # Initial Set: All HyperEdges containing start_node
+        # Filter initial edges too if needed? Yes.
+        initial_query = db.session.query(HyperEdgeMember)\
+            .filter(HyperEdgeMember.concept_id == start_node.id)\
+            .join(HyperEdgeMember.hyper_edge)
+            
+        if collection_ids:
+             from app.models.document import Document
+             initial_query = initial_query.join(HyperEdge.document).filter(Document.collection_id.in_(collection_ids))
+             
+        start_members = initial_query.all()
+        start_edges = [m.hyper_edge for m in start_members]
+        
+        for edge in start_edges:
+            queue.append((edge, [edge]))
+            
+        visited_edges = set([e.id for e in start_edges])
+        visited_concepts = set([start_node.id]) # Track visited concepts to avoid loops in semantic leap
+        found_paths = []
+        
+        from app.services.embedder import EmbedderService
+        embedder = EmbedderService() if use_semantic_leap else None
+        
+        while queue:
+            logger.info(f"Traversal Queue Size: {len(queue)}. Current Depth: {len(queue[0][1]) if queue else 0}")
+            current_edge, path = queue.popleft()
+            
+            if len(path) > max_depth:
+                continue
+                
+            # Check if current edge contains goal node
+            # We can check DB or check loaded object
+            member_ids = [m.concept_id for m in current_edge.members]
+            current_concept_ids = set(member_ids)
+            
+            # Update visited concepts
+            for c_id in current_concept_ids:
+                visited_concepts.add(c_id)
+
+            if goal_node.id in member_ids:
+                found_paths.append(path)
+                if len(found_paths) >= k_paths:
+                    break
+                continue
+            
+            # Expand: Find all edges that intersect with current_edge >= intersection_size
+            
+            # A. HARD LINK Expansion (Shared Concepts)
+            candidate_query = db.session.query(HyperEdgeMember)\
+                .filter(HyperEdgeMember.concept_id.in_(list(current_concept_ids)))\
+                .join(HyperEdgeMember.hyper_edge)
+                
+            if collection_ids:
+                from app.models.document import Document
+                candidate_query = candidate_query.join(HyperEdge.document).filter(Document.collection_id.in_(collection_ids))
+            
+            candidates = candidate_query.options(joinedload(HyperEdgeMember.hyper_edge).joinedload(HyperEdge.members)).all()
+            
+            hard_link_edges = {} # edge_id -> HyperEdge Obj
+            
+            for c_member in candidates:
+                e_id = c_member.hyper_edge_id
+                if e_id not in visited_edges:
+                    hard_link_edges[e_id] = c_member.hyper_edge
+            
+            # Process Hard Links (Must meet intersection size)
+            for cand_id, cand_edge in hard_link_edges.items():
+                cand_concept_ids = [m.concept_id for m in cand_edge.members]
+                
+                # Intersection count
+                common = set(current_concept_ids) & set(cand_concept_ids)
+                if len(common) >= intersection_size:
+                    visited_edges.add(cand_id)
+                    new_path = list(path)
+                    new_path.append(cand_edge)
+                    queue.append((cand_edge, new_path))
+                    # logger.debug(f"  -> Hard Link to {cand_id} via {common}")
+
+            # B. SEMANTIC LEAP Expansion (Vector Similarity)
+            # These bypass intersection checks because the link is semantic, not ID-based.
+            if use_semantic_leap and len(path) < max_depth: # Don't leap on last step
+                 current_concepts = [m.concept for m in current_edge.members]
+                 
+                 for concept in current_concepts:
+                     if concept.embedding is None: continue
+                     if len(concept.name) < 3: continue # Skip short concepts (stopwords)
+                     
+                     # Find similar concepts (exclude already visited)
+                     similar_concepts = db.session.query(Concept)\
+                        .filter(Concept.id.notin_(list(visited_concepts)))\
+                        .order_by(Concept.embedding.cosine_distance(concept.embedding))\
+                        .limit(2)\
+                        .all()
+                     
+                     for sim_concept in similar_concepts:
+                         if len(sim_concept.name) < 3: continue # Skip short targets
+                         
+                         dist = db.session.query(Concept.embedding.cosine_distance(concept.embedding))\
+                             .filter(Concept.id == sim_concept.id).scalar()
+                         
+                         if dist is not None and dist < 0.25:
+                             logger.info(f"Semantic Leap: {concept.name} -> {sim_concept.name} (dist: {dist:.3f})")
+                             
+                             # Find edges for this similar concept (LIMIT to avoid explosion)
+                             sim_query = db.session.query(HyperEdgeMember)\
+                                .filter(HyperEdgeMember.concept_id == sim_concept.id)\
+                                .join(HyperEdgeMember.hyper_edge)
+                             
+                             if collection_ids:
+                                 sim_query = sim_query.join(HyperEdge.document).filter(Document.collection_id.in_(collection_ids))
+                                 
+                             sim_members = sim_query.options(joinedload(HyperEdgeMember.hyper_edge).joinedload(HyperEdge.members)).limit(5).all() # Limit to 5 bridges
+                             
+                             # Add these edges directly (they are the bridge)
+                             for m in sim_members:
+                                 if m.hyper_edge_id not in visited_edges:
+                                     visited_edges.add(m.hyper_edge_id)
+                                     new_path = list(path)
+                                     new_path.append(m.hyper_edge)
+                                     queue.append((m.hyper_edge, new_path))
+                                     logger.info(f"     -> Added Bridge Edge {m.hyper_edge_id} via {sim_concept.name}")
+        
+        # 3. Path Reconstruction & Synthesis
+        if not found_paths:
+            return f"No connection found between {start_concept_name} and {goal_concept_name} within depth {max_depth}."
+            
+        return self._synthesize_paths(start_node, goal_node, found_paths)
+
+    def _synthesize_paths(self, start_node, goal_node, paths):
+        """
+        Turn raw paths into a human-readable explanation using LLM,
+        AND return structured graph data for Cytoscape.
+        """
+        # 1. Build Graph Data (Cytoscape JSON)
+        elements = {
+            "nodes": [],
+            "edges": []
+        }
+        
+        seen_nodes = set()
+        seen_edges = set()
+        
+        for path in paths:
+            for hyper_edge in path:
+                # Add HyperEdge Node (The Context)
+                if hyper_edge.id not in seen_nodes:
+                    # Shorten description for label if needed
+                    label = (hyper_edge.description[:30] + '..') if len(hyper_edge.description) > 30 else hyper_edge.description
+                    elements["nodes"].append({
+                        "data": {
+                            "id": str(hyper_edge.id),
+                            "label": label,
+                            "full_desc": hyper_edge.description,
+                            "source_document_id": str(hyper_edge.source_document_id) if hyper_edge.source_document_id else None,
+                            "source_document_title": hyper_edge.document.tag or hyper_edge.document.original_filename if hyper_edge.document else "Unknown Document",
+                            "source_document_type": hyper_edge.document.file_type if hyper_edge.document else None,
+                            "original_filename": hyper_edge.document.original_filename if hyper_edge.document else None,
+                            "page_number": hyper_edge.chunk.page_number if hyper_edge.chunk else None,
+                            "start_time": hyper_edge.chunk.start_time if hyper_edge.chunk else None,
+                            "type": "hyperedge",
+                            "color": "#888888" # Grey for context
+                        }
+                    })
+                    seen_nodes.add(hyper_edge.id)
+                
+                # Add Concept Nodes & Links
+                for member in hyper_edge.members:
+                    concept = member.concept
+                    
+                    # Add Concept Node
+                    if concept.id not in seen_nodes:
+                        elements["nodes"].append({
+                            "data": {
+                                "id": str(concept.id),
+                                "label": concept.name,
+                                "full_desc": concept.description,
+                                "type": "concept",
+                                "color": "#007BFF" # Blue for concepts
+                            }
+                        })
+                        seen_nodes.add(concept.id)
+                    
+                    # Add Link (Concept <-> HyperEdge)
+                    # Unique ID for edge: edgeID_conceptID
+                    link_id = f"{hyper_edge.id}_{concept.id}"
+                    if link_id not in seen_edges:
+                        # Directionality? Hypergraphs are often undirected sets, 
+                        # but if we have roles, we can use arrows.
+                        # For now, undirected containment is safest to visualize.
+                        elements["edges"].append({
+                            "data": {
+                                "id": link_id,
+                                "source": str(concept.id), 
+                                "target": str(hyper_edge.id),
+                                "label": member.role or ""
+                            }
+                        })
+                        seen_edges.add(link_id)
+
+        # 2. Generate Narrative
+        paths_text = ""
+        for i, path in enumerate(paths):
+            paths_text += f"Path {i+1}:\n"
+            for edge in path:
+                concepts = [m.concept.name for m in edge.members]
+                paths_text += f"  - Context: {edge.description} (Concepts: {', '.join(concepts)})\n"
+            paths_text += "\n"
+            
+        prompt = f"""
+        I have found the following logical paths connecting "{start_node.name}" to "{goal_node.name}" in a scientific knowledge graph.
+        
+        Paths:
+        {paths_text}
+        
+        Synthesize a coherent explanation (hypothesis) of how these concepts are related. 
+        Explain the "mechanistic bridge" - how one context leads to another via shared concepts.
+        """
+        
+        response = self.llm.chat(
+            system="You are an expert scientific reasoner.",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        return {
+            "narrative": response,
+            "graph_data": elements
+        }

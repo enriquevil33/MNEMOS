@@ -7,20 +7,23 @@ class LLMProvider(str, Enum):
     ANTHROPIC = "anthropic"
     GROQ = "groq"
     LM_STUDIO = "lm_studio"
+    LLAMACPP = "llamacpp"
     OLLAMA = "ollama"
+    CEREBRAS = "cerebras"
+    CUSTOM = "custom"
 
 class Settings(BaseSettings):
     # App
     SECRET_KEY: str = "dev"
     
     # Database
-    DATABASE_URL: str = "postgresql://raguser:ragpass@db:5432/ragdb"
+    DATABASE_URL: str = "postgresql://mnemos_user:mnemos_pass@db:5432/mnemos_db"
     
     # Redis
     REDIS_URL: str = "redis://redis:6379/0"
     
     # LLM Configuration
-    LLM_PROVIDER: LLMProvider = LLMProvider.LM_STUDIO
+    LLM_PROVIDER: LLMProvider = LLMProvider.LLAMACPP
     
     # OpenAI
     OPENAI_API_KEY: str = ""
@@ -32,15 +35,24 @@ class Settings(BaseSettings):
     
     # Groq
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.3-70b-versatile" # Default strong model from updated docs
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
     
+    # Cerebras
+    CEREBRAS_API_KEY: str = ""
+    CEREBRAS_MODEL: str = "llama-3.3-70b"
+
     # LM Studio / Ollama (OpenAI-compatible)
     LOCAL_LLM_BASE_URL: str = "http://host.docker.internal:1234/v1"
     LOCAL_LLM_MODEL: str = "local-model"
     
-    # Ollama (Dockerized)
+    # llama.cpp (Dockerized) - Lightweight GGUF server
+    LLAMACPP_BASE_URL: str = "http://llamacpp:8080/v1"
+    LLAMACPP_NUM_CTX: int = 2048
+
+    # Ollama (Dockerized) - Optional, use --profile ollama to enable
     # Using internal docker hostname 'ollama' and port 11434
-    OLLAMA_BASE_URL: str = "http://mnemos-ollama:11434/v1"
+    OLLAMA_SERVICE_NAME: str = "ollama" # The docker-compose service name
+    OLLAMA_BASE_URL: str = "http://ollama:11434/v1"
     OLLAMA_NUM_CTX: int = 2048 # Reduced to 2048 to fit in 6GB VRAM
     
     # Embeddings
@@ -64,17 +76,26 @@ class Settings(BaseSettings):
     WHISPER_DEVICE: str = "cuda"  # cpu, cuda
     
     # Chunking
-    CHUNK_SIZE: int = 512
-    CHUNK_OVERLAP: int = 50
+    CHUNK_SIZE: int = 1024
+    CHUNK_OVERLAP: int = 100
     
     # Storage
     # In docker, mapped to /app/uploads
     # Default to a local 'uploads' directory for Windows dev
     UPLOAD_FOLDER: str = os.path.join(os.getcwd(), 'uploads') if os.name == 'nt' else "/app/uploads"
-    MAX_CONTENT_LENGTH: int = 500 * 1024 * 1024  # 500MB
+    TRANSCRIPTION_FOLDER: str = os.path.join(UPLOAD_FOLDER, 'transcriptions')
+    ARCHIVE_FOLDER: str = os.path.join(os.getcwd(), 'archive') if os.name == 'nt' else "/app/archive"
+    MAX_CONTENT_LENGTH: int = 50 * 1024 * 1024 * 1024  # 50GB
+
+    # VideoMix Settings
+    VIDEOMIX_MAX_SEGMENTS: int = 50  # Maximum segments per video
+    VIDEOMIX_DEFAULT_RESOLUTION: str = '1080p'
+    VIDEOMIX_RENDER_TIMEOUT: int = 3600  # 1 hour timeout for rendering tasks
+
     
     class Config:
         env_file = ".env"
+        env_file_encoding = 'utf-8' # Ensure encoding is supported
         extra = "ignore" # Ignore extra env vars
 
 settings = Settings()

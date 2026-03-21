@@ -24,12 +24,12 @@ class ModelManager:
         old_model = cls._current_model
         cls._current_model = model_name
         logger.info(f"LLM model changed: {old_model} -> {model_name}")
-        
+
         # Persist to DB
         try:
             from app.extensions import db
             from app.models.user_preferences import UserPreferences
-            
+
             # We need an app context to access DB
             # This method is usually called from an API request (which has context)
             # If not, we skip persistence
@@ -38,7 +38,7 @@ class ModelManager:
                 if not prefs:
                     prefs = UserPreferences()
                     db.session.add(prefs)
-                
+
                 if prefs.selected_llm_model != model_name:
                     prefs.selected_llm_model = model_name
                     db.session.commit()

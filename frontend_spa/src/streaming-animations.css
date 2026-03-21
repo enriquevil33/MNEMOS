@@ -1,0 +1,109 @@
+/* ============================================
+   MONOCHROMATIC LLM STREAMING ANIMATIONS
+   ============================================ */
+
+/* 1. Container Entry Fade */
+.llm-stream-container {
+    animation: slickWordFade 0.6s ease-out forwards;
+}
+
+@keyframes slickWordFade {
+    0% {
+        opacity: 0;
+        transform: translateY(6px);
+        filter: blur(3px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
+}
+
+/* 2. Text Reveal Fix 
+   We remove the text background-clip gradient so the text is fully opaque and legible as it naturally streams in word-by-word from the API.
+*/
+.is-generating .markdown-content {
+    /* Optional: A very subtle pulse on the whole container while generating to give it life without hiding the text */
+    animation: containerPulse 3s ease-in-out infinite alternate;
+}
+
+@keyframes containerPulse {
+    0% {
+        opacity: 0.9;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+/* 3. Smooth Expanding Monochromatic Bar Indicator */
+/* Appended to the bottom of the container while generating */
+.is-generating::after {
+    content: '';
+    display: block;
+    width: 60%;
+    height: 1px;
+    margin-top: 16px;
+    background: linear-gradient(90deg,
+            transparent 0%,
+            var(--color-secondary) 40%,
+            var(--color-primary) 50%,
+            var(--color-secondary) 60%,
+            transparent 100%);
+    background-size: 200% auto;
+    border-radius: 2px;
+    transform-origin: left;
+    animation:
+        barExpand 1s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+        monoBarShimmer 3s ease-in-out infinite alternate;
+}
+
+@keyframes barExpand {
+    0% {
+        transform: scaleX(0);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scaleX(1);
+        opacity: 0.6;
+    }
+}
+
+@keyframes monoBarShimmer {
+    0% {
+        background-position: 100% center;
+    }
+
+    100% {
+        background-position: -100% center;
+    }
+}
+
+/* 4. Gemini-style Monochromatic typing cursor */
+.is-generating .markdown-content p:last-child::after {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 15px;
+    margin-left: 6px;
+    vertical-align: middle;
+    background: var(--color-primary);
+    border-radius: 2px;
+    animation: pulseMonoGlow 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes pulseMonoGlow {
+    0% {
+        opacity: 0.2;
+        transform: scaleY(0.9);
+    }
+
+    100% {
+        opacity: 0.9;
+        transform: scaleY(1.1);
+    }
+}

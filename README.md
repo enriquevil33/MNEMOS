@@ -1,6 +1,8 @@
 # MNEMOS: Context Daemon
  
-MNEMOS es un sistema de indexación semántica con memoria persistente y capacidades agénticas multimodales. Permite procesar documentos PDF, archivos de audio, videos y contenido de YouTube, proporcionando una interfaz conversacional inteligente para consultar información de estos documentos utilizando modelos de lenguaje grandes (LLMs).
+MNEMOS es un sistema de **GraphRAG** e indexación semántica con memoria persistente y capacidades agénticas multimodales.
+
+Va más allá de la búsqueda de texto tradicional al integrar un **Motor de Razonamiento** y **Extracción de Hipergrafos** para comprender y conectar relaciones complejas entre conceptos. Permite procesar documentos PDF, archivos de audio, videos y contenido de YouTube, proporcionando una interfaz conversacional inteligente para consultar y **analizar profundamente** la información utilizando modelos de lenguaje grandes (LLMs).
 
 
 ## Características Principales
@@ -11,6 +13,7 @@ MNEMOS es un sistema de indexación semántica con memoria persistente y capacid
 - **Lanzador Automático**: Script `launcher.py` para configuración "one-click" en Windows
 
 ### Procesamiento Multimodal
+- **Imágenes (Visión)**: Análisis inteligente de imágenes con modelos Llama 3.2 Vision y similares
 - **PDFs**: Extracción de texto y segmentación por páginas
 - **Audio/Video**: Transcripción automática usando Whisper de OpenAI
 - **YouTube**: Descarga y transcripción automática de videos
@@ -21,9 +24,12 @@ MNEMOS es un sistema de indexación semántica con memoria persistente y capacid
 - **Embeddings Vectoriales**: Utiliza pgvector con índices HNSW para búsquedas rápidas
 - **Búsqueda de Texto Completo**: Implementación con PostgreSQL FTS y configuración en español
 - **Chunking Inteligente**: Segmentación semántica de documentos usando LangChain
+- **Extracción Profunda (Hypergraph)**: Análisis granular de eventos, definiciones y relaciones semánticas dentro de los documentos.
+- **Motor de Razonamiento**: Capacidad de navegar el grafo de conocimiento para descubrir conexiones no obvias entre conceptos de diferentes documentos.
 
 ### Modelos de IA Flexibles
-Soporte para múltiples proveedores de LLM:
+- **Conexiones Personalizadas**: Soporte para cualquier proveedor compatible con OpenAI (ej. vLLM, DeepSeek) mediante URL base personalizada.
+- soporte para múltiples proveedores de LLM:
 - **Groq** (Inferencia ultra-rápida LPU)
 - **OpenAI** (GPT-4, GPT-3.5, etc.)
 - **Anthropic** (Claude Sonnet, Claude Opus)
@@ -34,6 +40,8 @@ Soporte para múltiples proveedores de LLM:
 - **Interfaz Web Moderna**: Single Page Application (SPA) construida con **Angular 19**.
 - **Diseño Responsivo**: Experiencia de usuario fluida en escritorio y móviles.
 - **Micro-interacciones**: Feedback visual inmediato y animaciones suaves.
+- **Gestión de Documentos Mejorada**: Barras de progreso en tiempo real para subidas y procesamiento.
+- **Visor de Imágenes**: Navegación tipo carrusel para imágenes adjuntas.
 - **API REST**: Endpoints completos para integración
 - **MCP Server**: Servidor Model Context Protocol para integración con Claude Desktop
 - **Sistema de Conversaciones**: Gestión de historial de chat con contexto
@@ -41,33 +49,32 @@ Soporte para múltiples proveedores de LLM:
 ## Arquitectura del Sistema
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Frontend (Angular SPA)               │
-│  - Puerto 5200 (Dev) / 80 (Prod)                        │
-│  - Gestión de documentos & Chat                         │
-│  - Visualización de fuentes                             │
-└────────────────────┬────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────┐
-│              Flask Application (API)                    │
-│  - Blueprints: documents, chat, conversations           │
-│  - Endpoints REST                                       │
-└──────┬──────────────────────────────────────┬──────────┘
-       │                                      │
-┌──────▼──────┐                     ┌────────▼──────────┐
-│   Celery    │                     │   RAG Service     │
-│   Worker    │                     │  - Búsqueda       │
-│             │                     │  - Generación     │
-│ - PDF Proc. │                     └─────────┬─────────┘
-│ - Transcr.  │                               │
-│ - Embedding │                     ┌─────────▼─────────┐
-└──────┬──────┘                     │  PostgreSQL +     │
-       │                            │  pgvector         │
-       └────────────────────────────►                   │
-                                    │  - Documentos     │
-                                    │  - Chunks         │
-                                    │  - Conversaciones │
-                                    └───────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│                   Frontend (Angular SPA)                  │
+│  - Settings, Chat, Library, Collections, GraphViz         │
+└─────────────────────────────┬─────────────────────────────┘
+                              │ REST API
+┌─────────────────────────────▼─────────────────────────────┐
+│                 Flask Application (API)                   │
+│   [Blueprints: documents, chat, settings, collections]    │
+└────────┬────────────────────┬────────────────────┬────────┘
+         │                    │                    │
+┌────────▼────────┐  ┌────────▼─────────┐  ┌───────▼────────┐
+│  Celery Worker  │  │   Logic / RAG    │  │ Ext. Providers │
+│                 │  │                  │  │                │
+│ - PDF Process   │  │ - Reasoning Eng  │  │ - OpenAI / Groq│
+│ - Summarization │  │ - Hypergraph Ext │  │ - Anthropic    │
+│ - Transcribe    │  │ - Summary Svc    │  │ - Ollama / LM  │
+│ - Embedder      │  │ - Search Logic   │  │ - Tavily/Duck  │
+└────────┬────────┘  └────────┬─────────┘  └───────┬────────┘
+         │                    │                    │
+         │           ┌────────▼─────────┐          │
+         └───────────►  PostgreSQL 16   ◄──────────┘
+                     │  - pgvector      │
+                     │  - Hypergraph    │
+                     │  - Memories      │
+                     │  - Collections   │
+                     └──────────────────┘
 ```
 
 ## Modelos de Datos
@@ -91,11 +98,23 @@ Soporte para múltiples proveedores de LLM:
 - **page_number**: Número de página para PDFs
 - **embedding**: Vector de embeddings (384 dimensiones por defecto)
 - **search_vector**: Vector de búsqueda de texto completo (PostgreSQL TSVECTOR)
+- **DocumentSection**: Secciones/capítulos vectorizados del documento (para resúmenes estructurados).
 
 ### Conversation & Message (Conversación y Mensajes)
 - Sistema de conversaciones con mensajes de usuario y asistente
 - Almacenamiento de fuentes utilizadas en cada respuesta
 - Gestión de historial completo
+
+### Knowledge Graph (Grafo de Conocimiento)
+- **Concept**: Entidades y definiciones extraídas (ej. "Proteína X", "Algoritmo Y").
+- **HyperEdge**: Relaciones complejas que conectan múltiples conceptos en un contexto específico.
+- **LLMConnection**: Configuración persistente de proveedores de LLM personalizados.
+
+### Gestión y Preferencias
+- **Collection**: Agrupación lógica de documentos (Carpetas/Temas).
+- **UserMemory**: Hechos permanentes extraídos sobre el usuario (Memoria a Largo Plazo).
+- **SystemPrompt**: Plantillas de instrucciones para el asistente (Prompt Engineering).
+- **UserPreferences**: Configuración centralizada (Modelo activo, Proveedores de Voz/Búsqueda, API Keys).
 
 ## Servicios Principales
 
@@ -142,6 +161,25 @@ Descarga y procesamiento de videos de YouTube:
 - Descarga de audio usando yt-dlp
 - Conversión a formato WAV
 - Extracción de metadatos (título, duración)
+
+### HypergraphExtractor ([app/services/hypergraph_extractor.py](app/services/hypergraph_extractor.py))
+Servicio de extracción profunda de conocimientos:
+- Procesa documentos por lotes para extraer entidades y eventos.
+- Construye relaciones semánticas (Hiperaristas) entre conceptos.
+- Normaliza y desambigua términos técnicos.
+
+### ReasoningEngine ([app/services/reasoning_engine.py](app/services/reasoning_engine.py))
+Motor de inferencia sobre el grafo de conocimiento:
+- Realiza recorridos (traversal) entre conceptos distantes.
+- Sintetiza explicaciones narrativas de las conexiones encontradas.
+- Genera datos para visualización de grafos (Cytoscape).
+
+### SummaryService ([app/services/summary_service.py](app/services/summary_service.py))
+Servicio de generación de resúmenes estructurados:
+- Utiliza patrón Map-Reduce para documentos largos.
+- Identifica estructura de capítulos automáticamente.
+- Extrae conceptos clave por sección y genera un resumen ejecutivo global.
+
 
 ## Instalación y Configuración
 
@@ -404,7 +442,27 @@ deploy:
           capabilities: [ gpu ]
 ```
 
-Asegurarse de tener nvidia-docker instalado.
+
+
+### Configuración de Búsqueda Web
+Habilitar capacidades de navegación para el agente:
+```env
+# Proveedor: duckduckgo, tavily, brave
+WEB_SEARCH_PROVIDER=tavily
+TAVILY_API_KEY=tvly-...
+```
+
+### Configuración de Voz (TTS/STT)
+Mnemos soporta múltiples motores de voz para entrada y salida de audio:
+- **TTS (Texto a Voz)**: Browser (gratis), OpenAI (HD), Deepgram.
+- **STT (Voz a Texto)**: Browser, OpenAI Whisper, Deepgram Nova.
+
+### Memoria a Largo Plazo
+Activar la retención de hechos entre conversaciones:
+```env
+MEMORY_ENABLED=true
+MEMORY_PROVIDER=ollama # o openai
+```
 
 ## Estructura del Proyecto
 
@@ -613,8 +671,8 @@ Las contribuciones son bienvenidas. Por favor:
 
 Funcionalidades planeadas:
 - [x] Soporte para EPUB (Incluyendo metadatos)
-- [ ] Soporte para más formatos de documentos (Word, Excel, PowerPoint)
-- [ ] Procesamiento de imágenes con modelos multimodales
+- [x] Soporte para más formatos de documentos (Word, Excel, PowerPoint)
+- [x] Procesamiento de imágenes con modelos multimodales (Visión)
 - [ ] Exportación de conversaciones
 
 
