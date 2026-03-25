@@ -1,1 +1,0 @@
-# MNEMOS Resources Folder
