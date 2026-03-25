@@ -31,7 +31,8 @@ def create_app():
     from app.api.connections import bp as connections_bp
     from app.api.ollama_manage import bp as ollama_manage_bp # Changed: Import ollama_manage_bp
     from app.api.collections import bp as collections_bp
-    
+    from app.api.docs import bp as docs_bp
+
     app.register_blueprint(documents_bp)
     app.register_blueprint(collections_bp)
     app.register_blueprint(chat_bp)
@@ -40,6 +41,7 @@ def create_app():
     app.register_blueprint(settings_bp, url_prefix='/api/settings') # Changed: Added url_prefix
     app.register_blueprint(connections_bp)
     app.register_blueprint(ollama_manage_bp, url_prefix='/api/settings/ollama')
+    app.register_blueprint(docs_bp)
     
     from app.api.memory import bp as memory_bp
     app.register_blueprint(memory_bp, url_prefix='/api/memory')

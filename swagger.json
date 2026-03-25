@@ -1,0 +1,3053 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Mnemos API",
+    "description": "Knowledge management and RAG (Retrieval-Augmented Generation) system with multi-modal chat, document processing, knowledge graphs, and video mixing capabilities.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "API Support"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000",
+      "description": "Backend server"
+    },
+    {
+      "url": "http://localhost:5200",
+      "description": "Frontend proxy"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Documents",
+      "description": "Document upload, processing, and management"
+    },
+    {
+      "name": "Chat",
+      "description": "RAG-powered chat with document context"
+    },
+    {
+      "name": "Conversations",
+      "description": "Conversation history management"
+    },
+    {
+      "name": "Collections",
+      "description": "Document collection organization"
+    },
+    {
+      "name": "Settings",
+      "description": "Application settings and configuration"
+    },
+    {
+      "name": "Connections",
+      "description": "Custom LLM connection management"
+    },
+    {
+      "name": "Memory",
+      "description": "Long-term user memory management"
+    },
+    {
+      "name": "Voice",
+      "description": "Speech-to-text and text-to-speech"
+    },
+    {
+      "name": "Reasoning",
+      "description": "Knowledge graph reasoning and traversal"
+    },
+    {
+      "name": "Wiki",
+      "description": "Concept wiki and knowledge base"
+    },
+    {
+      "name": "VideoMix",
+      "description": "Video mixing and generation"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT authentication (placeholder for future implementation)"
+      },
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API Key authentication (placeholder for future implementation)"
+      }
+    },
+    "schemas": {
+      "Document": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "a3f1c2b4-5e6d-7f8a-9b0c-1d2e3f4a5b6c"
+          },
+          "filename": {
+            "type": "string",
+            "example": "abc123_research_paper.pdf"
+          },
+          "original_filename": {
+            "type": "string",
+            "example": "research_paper.pdf"
+          },
+          "file_type": {
+            "type": "string",
+            "enum": ["pdf", "audio", "video", "youtube", "epub"],
+            "example": "pdf"
+          },
+          "youtube_url": {
+            "type": "string",
+            "nullable": true,
+            "example": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "processing", "completed", "error"],
+            "example": "completed"
+          },
+          "processing_progress": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "example": 100
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-01-15T14:30:00Z"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true
+          },
+          "collection_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "example": "b4c2d3e4-6f7a-8b9c-0d1e-2f3a4b5c6d7e"
+          },
+          "tag": {
+            "type": "string",
+            "nullable": true,
+            "example": "research"
+          },
+          "stars": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "nullable": true,
+            "example": 4
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true,
+            "example": "Important reference for AI research"
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true,
+            "example": "This paper discusses advances in transformer architectures..."
+          }
+        }
+      },
+      "DocumentSection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "example": "Introduction"
+          },
+          "start_time": {
+            "type": "number",
+            "format": "float",
+            "example": 120.5
+          },
+          "end_time": {
+            "type": "number",
+            "format": "float",
+            "example": 245.8
+          },
+          "order": {
+            "type": "integer",
+            "example": 1
+          }
+        }
+      },
+      "Collection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "c5d3e4f5-7a8b-9c0d-1e2f-3a4b5c6d7e8f"
+          },
+          "name": {
+            "type": "string",
+            "example": "AI Research Papers"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "example": "Collection of papers on artificial intelligence and machine learning"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-01-10T10:00:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-01-15T14:30:00Z"
+          }
+        }
+      },
+      "Conversation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "d6e4f5a6-8b9c-0d1e-2f3a-4b5c6d7e8f9a"
+          },
+          "title": {
+            "type": "string",
+            "example": "Discussion about transformers"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-01-15T14:30:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-01-15T15:45:00Z"
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["user", "assistant"],
+            "example": "user"
+          },
+          "content": {
+            "type": "string",
+            "example": "What are the main components of a transformer?"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "nullable": true
+          },
+          "search_queries": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "audio_path": {
+            "type": "string",
+            "nullable": true
+          },
+          "graph_data": {
+            "type": "object",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-01-15T14:30:00Z"
+          }
+        }
+      },
+      "ChatRequest": {
+        "type": "object",
+        "required": ["question"],
+        "properties": {
+          "question": {
+            "type": "string",
+            "example": "What are the key innovations in transformer architecture?"
+          },
+          "document_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": ["a3f1c2b4-5e6d-7f8a-9b0c-1d2e3f4a5b6c"]
+          },
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "example": "d6e4f5a6-8b9c-0d1e-2f3a-4b5c6d7e8f9a"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Base64 encoded images"
+          },
+          "web_search": {
+            "type": "boolean",
+            "default": false
+          },
+          "use_graph_rag": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "ChatResponse": {
+        "type": "object",
+        "properties": {
+          "answer": {
+            "type": "string",
+            "example": "Transformers introduced self-attention mechanisms that allow the model to weigh the importance of different parts of the input..."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "document": {
+                  "type": "string",
+                  "example": "research_paper.pdf"
+                },
+                "chunk": {
+                  "type": "string",
+                  "example": "The self-attention mechanism computes attention weights..."
+                },
+                "page": {
+                  "type": "integer",
+                  "example": 3
+                }
+              }
+            }
+          },
+          "search_queries": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "context_warning": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UserPreferences": {
+        "type": "object",
+        "properties": {
+          "use_conversation_context": {
+            "type": "boolean",
+            "example": true
+          },
+          "max_context_messages": {
+            "type": "integer",
+            "example": 10
+          },
+          "chunk_size": {
+            "type": "integer",
+            "example": 1024
+          },
+          "chunk_overlap": {
+            "type": "integer",
+            "example": 100
+          },
+          "whisper_model": {
+            "type": "string",
+            "example": "base"
+          },
+          "llm_provider": {
+            "type": "string",
+            "enum": ["ollama", "openai", "anthropic", "groq", "custom"],
+            "example": "openai"
+          },
+          "selected_llm_model": {
+            "type": "string",
+            "example": "gpt-4"
+          },
+          "memory_enabled": {
+            "type": "boolean",
+            "example": false
+          },
+          "llm_temperature": {
+            "type": "number",
+            "format": "float",
+            "example": 0.7
+          },
+          "llm_top_p": {
+            "type": "number",
+            "format": "float",
+            "example": 0.9
+          }
+        }
+      },
+      "SystemPrompt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "example": "Research Assistant"
+          },
+          "content": {
+            "type": "string",
+            "example": "You are a helpful research assistant..."
+          },
+          "is_default": {
+            "type": "boolean",
+            "example": false
+          }
+        }
+      },
+      "LLMConnection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "My Custom OpenAI"
+          },
+          "provider_type": {
+            "type": "string",
+            "example": "openai"
+          },
+          "base_url": {
+            "type": "string",
+            "example": "https://api.openai.com/v1"
+          },
+          "api_key": {
+            "type": "string",
+            "example": "sk-***masked***"
+          },
+          "default_model": {
+            "type": "string",
+            "example": "gpt-4"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UserMemory": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "content": {
+            "type": "string",
+            "example": "User prefers detailed explanations with examples"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-01-15T14:30:00Z"
+          }
+        }
+      },
+      "Concept": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Transformer Architecture"
+          },
+          "description": {
+            "type": "string",
+            "example": "A neural network architecture based on self-attention mechanisms"
+          }
+        }
+      },
+      "VideoMixProject": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "example": "AI Overview Video"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["draft", "generating_script", "script_ready", "rendering", "completed", "error"],
+            "example": "completed"
+          },
+          "user_prompt": {
+            "type": "string",
+            "example": "Create a 5-minute overview of transformer architectures"
+          },
+          "document_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "resolution": {
+            "type": "string",
+            "enum": ["1080p", "720p", "480p", "source"],
+            "example": "1080p"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "VideoMixScript": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "project_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "example": 1
+          },
+          "script_data": {
+            "type": "object",
+            "properties": {
+              "segments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "document_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "chunk_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "start_time": {
+                      "type": "number",
+                      "example": 120.5
+                    },
+                    "end_time": {
+                      "type": "number",
+                      "example": 145.2
+                    },
+                    "title": {
+                      "type": "string",
+                      "example": "Introduction to Attention"
+                    },
+                    "order": {
+                      "type": "integer",
+                      "example": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "total_duration": {
+            "type": "number",
+            "example": 300.5
+          },
+          "segment_count": {
+            "type": "integer",
+            "example": 10
+          }
+        }
+      },
+      "VideoMixRenderJob": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "script_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["queued", "processing", "completed", "failed", "cancelled"],
+            "example": "completed"
+          },
+          "progress": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "example": 100
+          },
+          "output_path": {
+            "type": "string",
+            "nullable": true,
+            "example": "/uploads/videomix_output/video_abc123.mp4"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Resource not found"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/documents/": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "List all documents",
+        "description": "Retrieve all documents with optional filtering by collection. Returns HTML partial for HTMX requests or JSON.",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "query",
+            "description": "Filter by collection ID (use 'null' for uncollected documents)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of documents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Document"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/upload": {
+      "post": {
+        "tags": ["Documents"],
+        "summary": "Upload a document",
+        "description": "Upload a file or provide a YouTube URL for processing. Supported formats: PDF, EPUB, audio (MP3, WAV, M4A), video (MP4, WebM, MOV).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "File to upload"
+                  },
+                  "youtube_url": {
+                    "type": "string",
+                    "description": "YouTube URL (alternative to file upload)",
+                    "example": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Document created and queued for processing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No file or URL provided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{doc_id}": {
+      "put": {
+        "tags": ["Documents"],
+        "summary": "Update document metadata",
+        "description": "Update document tags, stars, comments, or collection assignment.",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "example": "important"
+                  },
+                  "stars": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5,
+                    "example": 5
+                  },
+                  "comment": {
+                    "type": "string",
+                    "example": "Key reference material"
+                  },
+                  "collection_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Document updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Document not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Documents"],
+        "summary": "Delete a document",
+        "description": "Delete document and associated files from the system.",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document deleted successfully"
+          },
+          "404": {
+            "description": "Document not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{doc_id}/status": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "Get document processing status",
+        "description": "Get current processing status (for HTMX polling).",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Document"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{doc_id}/content": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "Download document file",
+        "description": "Download the original document file.",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File download",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Document not found"
+          }
+        }
+      }
+    },
+    "/api/documents/{doc_id}/sections": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "Get document sections",
+        "description": "Retrieve all sections/chapters for a document (for video/audio files).",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of sections",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentSection"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{doc_id}/transcribe": {
+      "post": {
+        "tags": ["Documents"],
+        "summary": "Generate transcription",
+        "description": "Generate or retrieve transcription for audio/video documents.",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transcription available or generated"
+          },
+          "202": {
+            "description": "Transcription queued for generation"
+          }
+        }
+      }
+    },
+    "/api/documents/{doc_id}/transcription": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "Download transcription",
+        "description": "Download transcription as text file.",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transcription file",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{doc_id}/summary": {
+      "post": {
+        "tags": ["Documents"],
+        "summary": "Generate document summary",
+        "description": "Trigger background task to generate document summary using LLM.",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Summary generation queued"
+          }
+        }
+      }
+    },
+    "/api/documents/reprocess-hypergraph": {
+      "post": {
+        "tags": ["Documents"],
+        "summary": "Reprocess hypergraph extraction",
+        "description": "Trigger hypergraph (knowledge graph) reprocessing for all or missing documents.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "missing_only": {
+                    "type": "boolean",
+                    "example": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Reprocessing queued"
+          }
+        }
+      }
+    },
+    "/api/chat/": {
+      "post": {
+        "tags": ["Chat"],
+        "summary": "Send chat message",
+        "description": "Send a chat message with optional RAG (Retrieval-Augmented Generation) context from documents, web search, or knowledge graph.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chat response with answer and sources",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/": {
+      "get": {
+        "tags": ["Conversations"],
+        "summary": "List all conversations",
+        "description": "Retrieve all conversation history with optional search.",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search term for filtering conversations",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of conversations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Conversation"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Conversations"],
+        "summary": "Create new conversation",
+        "description": "Create a new conversation with optional title.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "example": "New discussion"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Conversation created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversation"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{id}": {
+      "get": {
+        "tags": ["Conversations"],
+        "summary": "Get conversation details",
+        "description": "Retrieve conversation with all messages and related documents.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation with messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Conversation"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "messages": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Message"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Conversations"],
+        "summary": "Delete conversation",
+        "description": "Delete conversation and all associated messages.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation deleted"
+          },
+          "404": {
+            "description": "Conversation not found"
+          }
+        }
+      }
+    },
+    "/api/collections/": {
+      "get": {
+        "tags": ["Collections"],
+        "summary": "List all collections",
+        "description": "Retrieve all document collections.",
+        "responses": {
+          "200": {
+            "description": "List of collections",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Collection"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Collections"],
+        "summary": "Create collection",
+        "description": "Create a new document collection.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Research Papers"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "Collection of AI research papers"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Collection created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/api/collections/{id}": {
+      "put": {
+        "tags": ["Collections"],
+        "summary": "Update collection",
+        "description": "Update collection name or description.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Collection updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Collection not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Collections"],
+        "summary": "Delete collection",
+        "description": "Delete collection (documents remain but become uncollected).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Collection deleted"
+          },
+          "404": {
+            "description": "Collection not found"
+          }
+        }
+      }
+    },
+    "/api/settings/models": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "List llama.cpp models",
+        "description": "List available GGUF models for llama.cpp with vision capability detection.",
+        "responses": {
+          "200": {
+            "description": "List of models",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "example": "llama-3.2-3b-instruct"
+                      },
+                      "supports_vision": {
+                        "type": "boolean",
+                        "example": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Settings"],
+        "summary": "Delete model",
+        "description": "Delete a GGUF model file.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["model"],
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "example": "llama-3.2-3b-instruct"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Model deleted"
+          },
+          "400": {
+            "description": "Error deleting model"
+          }
+        }
+      }
+    },
+    "/api/settings/llamacpp/models": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "List GGUF models",
+        "description": "List all GGUF model files available for llama.cpp with file sizes.",
+        "responses": {
+          "200": {
+            "description": "List of GGUF files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "filename": {
+                        "type": "string",
+                        "example": "llama-3.2-3b-instruct-q4.gguf"
+                      },
+                      "size": {
+                        "type": "integer",
+                        "example": 2147483648
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/pull": {
+      "post": {
+        "tags": ["Settings"],
+        "summary": "Download model",
+        "description": "DEPRECATED: Use llama.cpp model import instead. Download a model (kept for backward compatibility).",
+        "deprecated": true,
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "display_name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Download started"
+          }
+        }
+      }
+    },
+    "/api/settings/pull/status/{task_id}": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Get download status",
+        "description": "DEPRECATED: Use llama.cpp instead. Get model download progress.",
+        "deprecated": true,
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Download status"
+          }
+        }
+      }
+    },
+    "/api/settings/pull/active": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Get active downloads",
+        "description": "DEPRECATED: Use llama.cpp instead. List active download tasks.",
+        "deprecated": true,
+        "responses": {
+          "200": {
+            "description": "Active downloads"
+          }
+        }
+      }
+    },
+    "/api/settings/pull/{task_id}": {
+      "delete": {
+        "tags": ["Settings"],
+        "summary": "Cancel download",
+        "description": "DEPRECATED: Use llama.cpp instead. Cancel a download task.",
+        "deprecated": true,
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Download cancelled"
+          }
+        }
+      }
+    },
+    "/api/settings/library/search": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Search HuggingFace models",
+        "description": "Search HuggingFace for GGUF models.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "example": "downloads"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "example": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results"
+          }
+        }
+      }
+    },
+    "/api/settings/files/{repo_id}": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "List HuggingFace repo files",
+        "description": "List GGUF files in a HuggingFace repository.",
+        "parameters": [
+          {
+            "name": "repo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of GGUF files"
+          }
+        }
+      }
+    },
+    "/api/settings/pull_gguf": {
+      "post": {
+        "tags": ["Settings"],
+        "summary": "Download GGUF model",
+        "description": "Download GGUF model from HuggingFace.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["repo_id", "filename", "model_name"],
+                "properties": {
+                  "repo_id": {
+                    "type": "string",
+                    "example": "bartowski/Llama-3.2-3B-Instruct-GGUF"
+                  },
+                  "filename": {
+                    "type": "string",
+                    "example": "Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+                  },
+                  "model_name": {
+                    "type": "string",
+                    "example": "llama-3.2-3b-instruct"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Download started"
+          }
+        }
+      }
+    },
+    "/api/settings/import/scan": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Scan for GGUF files",
+        "description": "Scan system for GGUF model files.",
+        "responses": {
+          "200": {
+            "description": "List of found GGUF files"
+          }
+        }
+      }
+    },
+    "/api/settings/import/upload": {
+      "post": {
+        "tags": ["Settings"],
+        "summary": "Upload GGUF file",
+        "description": "Upload a GGUF model file.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File uploaded"
+          }
+        }
+      }
+    },
+    "/api/settings/import": {
+      "post": {
+        "tags": ["Settings"],
+        "summary": "Import GGUF model",
+        "description": "Import a GGUF model file into llama.cpp.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["filename", "model_name"],
+                "properties": {
+                  "filename": {
+                    "type": "string",
+                    "example": "model.gguf"
+                  },
+                  "model_name": {
+                    "type": "string",
+                    "example": "my-custom-model"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Model imported"
+          }
+        }
+      }
+    },
+    "/api/settings/current-model": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Get current LLM model",
+        "description": "Get the currently selected LLM model and provider.",
+        "responses": {
+          "200": {
+            "description": "Current model info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "model": {
+                      "type": "string",
+                      "example": "gpt-4"
+                    },
+                    "provider": {
+                      "type": "string",
+                      "example": "openai"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Settings"],
+        "summary": "Set current LLM model",
+        "description": "Set the active LLM model.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["model"],
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "example": "gpt-4"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Model updated"
+          }
+        }
+      }
+    },
+    "/api/settings/chat": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Get chat settings",
+        "description": "Retrieve all chat and LLM settings.",
+        "responses": {
+          "200": {
+            "description": "Chat settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPreferences"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Settings"],
+        "summary": "Update chat settings",
+        "description": "Update chat settings, LLM configuration, API keys, etc.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserPreferences"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings updated"
+          }
+        }
+      }
+    },
+    "/api/settings/prompts": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "List system prompts",
+        "description": "Get all available system prompts (default and custom).",
+        "responses": {
+          "200": {
+            "description": "List of system prompts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SystemPrompt"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Settings"],
+        "summary": "Create custom system prompt",
+        "description": "Create a new custom system prompt.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "content"],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "example": "Code Reviewer"
+                  },
+                  "content": {
+                    "type": "string",
+                    "example": "You are an expert code reviewer..."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "System prompt created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemPrompt"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/prompts/{id}": {
+      "put": {
+        "tags": ["Settings"],
+        "summary": "Update system prompt",
+        "description": "Update a custom system prompt.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "System prompt updated"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Settings"],
+        "summary": "Delete system prompt",
+        "description": "Delete a custom system prompt (default prompts cannot be deleted).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "System prompt deleted"
+          }
+        }
+      }
+    },
+    "/api/settings/hardware": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Get hardware info",
+        "description": "Get system RAM and VRAM information.",
+        "responses": {
+          "200": {
+            "description": "Hardware information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ram_total": {
+                      "type": "integer",
+                      "example": 16000000000
+                    },
+                    "ram_available": {
+                      "type": "integer",
+                      "example": 8000000000
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/models/lookup": {
+      "post": {
+        "tags": ["Settings"],
+        "summary": "Lookup provider models",
+        "description": "Fetch available models from a specific LLM provider.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["provider", "api_key"],
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": ["openai", "anthropic", "groq"],
+                    "example": "openai"
+                  },
+                  "api_key": {
+                    "type": "string",
+                    "example": "sk-..."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "List of models"
+          }
+        }
+      }
+    },
+    "/api/settings/connections/": {
+      "get": {
+        "tags": ["Connections"],
+        "summary": "List LLM connections",
+        "description": "Get all custom LLM connection configurations.",
+        "responses": {
+          "200": {
+            "description": "List of connections",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LLMConnection"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Connections"],
+        "summary": "Create LLM connection",
+        "description": "Create a new custom LLM connection.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "base_url", "api_key"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "My Custom OpenAI"
+                  },
+                  "provider_type": {
+                    "type": "string",
+                    "example": "openai"
+                  },
+                  "base_url": {
+                    "type": "string",
+                    "example": "https://api.openai.com/v1"
+                  },
+                  "api_key": {
+                    "type": "string",
+                    "example": "sk-..."
+                  },
+                  "default_model": {
+                    "type": "string",
+                    "example": "gpt-4"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Connection created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LLMConnection"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/connections/{id}": {
+      "put": {
+        "tags": ["Connections"],
+        "summary": "Update LLM connection",
+        "description": "Update a custom LLM connection.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "base_url": {
+                    "type": "string"
+                  },
+                  "api_key": {
+                    "type": "string"
+                  },
+                  "default_model": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connection updated"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Connections"],
+        "summary": "Delete LLM connection",
+        "description": "Delete a custom LLM connection.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Connection deleted"
+          }
+        }
+      }
+    },
+    "/api/settings/connections/active": {
+      "post": {
+        "tags": ["Connections"],
+        "summary": "Set active connection",
+        "description": "Set the active LLM connection.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["connection_id"],
+                "properties": {
+                  "connection_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Active connection set"
+          }
+        }
+      }
+    },
+    "/api/memory/": {
+      "get": {
+        "tags": ["Memory"],
+        "summary": "Get user memories",
+        "description": "Retrieve all long-term user memory facts.",
+        "responses": {
+          "200": {
+            "description": "List of memories with usage statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "memories": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/UserMemory"
+                      }
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "max_memories": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/memory/{id}": {
+      "delete": {
+        "tags": ["Memory"],
+        "summary": "Delete memory",
+        "description": "Delete a specific user memory.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Memory deleted"
+          }
+        }
+      }
+    },
+    "/api/voice/transcribe": {
+      "post": {
+        "tags": ["Voice"],
+        "summary": "Transcribe audio",
+        "description": "Transcribe audio file to text using Whisper or configured STT provider.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transcription result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "example": "This is the transcribed text"
+                    },
+                    "segments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/voice/synthesize": {
+      "post": {
+        "tags": ["Voice"],
+        "summary": "Synthesize speech",
+        "description": "Convert text to speech using configured TTS provider.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["text"],
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "example": "Hello, this is a test of text to speech"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Audio file",
+            "content": {
+              "audio/mpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/voice/message/{id}/audio": {
+      "get": {
+        "tags": ["Voice"],
+        "summary": "Get message audio",
+        "description": "Get or generate audio for a specific message.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audio file",
+            "content": {
+              "audio/mpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reasoning/traverse": {
+      "post": {
+        "tags": ["Reasoning"],
+        "summary": "Traverse knowledge graph",
+        "description": "Find reasoning path between two concepts using the knowledge graph.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["start", "goal"],
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "example": "Neural Networks"
+                  },
+                  "goal": {
+                    "type": "string",
+                    "example": "Transformers"
+                  },
+                  "collection_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "save_to_chat": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "use_semantic_leap": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "max_depth": {
+                    "type": "integer",
+                    "default": 3
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reasoning path with narrative and graph data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "narrative": {
+                      "type": "string",
+                      "example": "Neural Networks evolved into Transformers through..."
+                    },
+                    "graph_data": {
+                      "type": "object",
+                      "properties": {
+                        "nodes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "edges": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    },
+                    "conversation_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reasoning/reprocess": {
+      "post": {
+        "tags": ["Reasoning"],
+        "summary": "Reprocess hypergraph",
+        "description": "Reprocess knowledge graph extraction for all documents.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "missing_only": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Reprocessing started"
+          }
+        }
+      }
+    },
+    "/api/reasoning/reprocess/status": {
+      "get": {
+        "tags": ["Reasoning"],
+        "summary": "Get reprocessing status",
+        "description": "Get status of hypergraph reprocessing task.",
+        "responses": {
+          "200": {
+            "description": "Reprocessing status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "processing"
+                    },
+                    "progress": {
+                      "type": "integer",
+                      "example": 45
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/wiki/concepts": {
+      "get": {
+        "tags": ["Wiki"],
+        "summary": "List concepts",
+        "description": "List all concepts in the knowledge base with pagination.",
+        "parameters": [
+          {
+            "name": "letter",
+            "in": "query",
+            "description": "Filter by first letter",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of concepts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "concepts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Concept"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/wiki/article/{name}": {
+      "get": {
+        "tags": ["Wiki"],
+        "summary": "Get concept article",
+        "description": "Get detailed article for a concept with relations and sources.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Concept article with relations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "relations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "related": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Concept"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Concept not found"
+          }
+        }
+      }
+    },
+    "/api/wiki/search": {
+      "get": {
+        "tags": ["Wiki"],
+        "summary": "Search concepts",
+        "description": "Search concepts by name or description.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Concept"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videomix/projects": {
+      "get": {
+        "tags": ["VideoMix"],
+        "summary": "List video projects",
+        "description": "Get all video mix projects.",
+        "responses": {
+          "200": {
+            "description": "List of projects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VideoMixProject"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["VideoMix"],
+        "summary": "Create video project",
+        "description": "Create a new video mix project.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "user_prompt", "document_ids"],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "example": "AI Overview Video"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "5-minute video about transformers"
+                  },
+                  "user_prompt": {
+                    "type": "string",
+                    "example": "Create a comprehensive overview of transformer architectures"
+                  },
+                  "document_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "resolution": {
+                    "type": "string",
+                    "enum": ["1080p", "720p", "480p", "source"],
+                    "default": "1080p"
+                  },
+                  "title_cards_enabled": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "max_duration_seconds": {
+                    "type": "integer",
+                    "nullable": true
+                  },
+                  "audio_normalization": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Project created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoMixProject"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videomix/projects/{id}": {
+      "get": {
+        "tags": ["VideoMix"],
+        "summary": "Get project details",
+        "description": "Get video project with scripts and render jobs.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project details"
+          },
+          "404": {
+            "description": "Project not found"
+          }
+        }
+      },
+      "put": {
+        "tags": ["VideoMix"],
+        "summary": "Update project",
+        "description": "Update video project details.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "resolution": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Project updated"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["VideoMix"],
+        "summary": "Delete project",
+        "description": "Delete video project and associated files.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project deleted"
+          }
+        }
+      }
+    },
+    "/api/videomix/projects/{id}/generate-script": {
+      "post": {
+        "tags": ["VideoMix"],
+        "summary": "Generate video script",
+        "description": "Generate video script using LLM based on project prompt and documents.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Script generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoMixScript"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videomix/projects/{id}/refine-script": {
+      "post": {
+        "tags": ["VideoMix"],
+        "summary": "Refine video script",
+        "description": "Refine existing script based on user feedback.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["message"],
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "example": "Make it shorter and focus more on practical examples"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Refined script created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoMixScript"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videomix/scripts/{id}/render": {
+      "post": {
+        "tags": ["VideoMix"],
+        "summary": "Render video",
+        "description": "Start rendering video from script.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Render started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoMixRenderJob"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videomix/render-jobs/{id}": {
+      "get": {
+        "tags": ["VideoMix"],
+        "summary": "Get render status",
+        "description": "Get status of a render job.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Render job status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoMixRenderJob"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videomix/render-jobs/{id}/cancel": {
+      "post": {
+        "tags": ["VideoMix"],
+        "summary": "Cancel render",
+        "description": "Cancel an in-progress render job.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Render cancelled"
+          }
+        }
+      }
+    },
+    "/api/videomix/render-jobs/{id}/download": {
+      "get": {
+        "tags": ["VideoMix"],
+        "summary": "Download rendered video",
+        "description": "Download completed video file.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Video file",
+            "content": {
+              "video/mp4": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Video not found or not ready"
+          }
+        }
+      }
+    },
+    "/api/settings/ollama/status": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Check Ollama status",
+        "description": "DEPRECATED: Use llama.cpp instead. Check Ollama container status.",
+        "deprecated": true,
+        "responses": {
+          "200": {
+            "description": "Ollama status"
+          }
+        }
+      }
+    },
+    "/api/settings/ollama/install": {
+      "post": {
+        "tags": ["Settings"],
+        "summary": "Install Ollama",
+        "description": "DEPRECATED: Use llama.cpp instead. Pull Ollama Docker image.",
+        "deprecated": true,
+        "responses": {
+          "200": {
+            "description": "Installation progress (streaming)"
+          }
+        }
+      }
+    },
+    "/api/settings/ollama/start": {
+      "post": {
+        "tags": ["Settings"],
+        "summary": "Start Ollama",
+        "description": "DEPRECATED: Use llama.cpp instead. Start Ollama container.",
+        "deprecated": true,
+        "responses": {
+          "200": {
+            "description": "Container started"
+          }
+        }
+      }
+    }
+  }
+}
