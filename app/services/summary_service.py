@@ -13,16 +13,16 @@ logger = logging.getLogger(__name__)
 
 class SummaryService:
     @staticmethod
-    def _sanitize_title(title: str, max_length: int = 480) -> str:
+    def _sanitize_title(title: str, max_length: int = 250) -> str:
         """
         Sanitize and truncate section title intelligently.
 
         Truncates at word boundaries when possible to maintain readability.
-        Leaves 20-char buffer from database limit (500) for safety.
+        Leaves 5-char buffer from database limit (255) for safety.
 
         Args:
             title: Raw title from LLM
-            max_length: Maximum allowed length (default 480)
+            max_length: Maximum allowed length (default 250)
 
         Returns:
             Sanitized title that fits within database constraints
@@ -186,7 +186,7 @@ class SummaryService:
             prompt = f"""Analyze this document segment.
 Return a valid JSON object (no markdown):
 {{
-    "title": "A concise, descriptive title for this segment (max 100 chars, infer if missing)",
+    "title": "A concise, descriptive title for this segment. MUST be under 80 characters. Infer if missing.",
     "summary": "Concise summary of this segment.",
     "concepts": [
          {{ "name": "Concept Name", "relevance": 1-10 }}
