@@ -25,16 +25,32 @@ class EmbedderService:
                     HardwareDetector.log_hardware_info()
                     cls._hardware_logged = True
 
-                # Determine device
-                if settings.EMBEDDING_DEVICE == "auto":
-                    device = HardwareDetector.get_device()
-                else:
-                    device = settings.EMBEDDING_DEVICE
+                # Determine device with validation and fallback
+                device = HardwareDetector.resolve_device(settings.EMBEDDING_DEVICE)
 
                 logger.info(f"Loading embedding model: {settings.EMBEDDING_MODEL} on {device}")
 
-                # Load model with device
-                cls._model = SentenceTransformer(settings.EMBEDDING_MODEL, device=device)
+                try:
+                    # Load model with validated device
+                    cls._model = SentenceTransformer(settings.EMBEDDING_MODEL, device=device)
+                except Exception as e:
+                    # Handle cases where model loading fails despite device validation
+                    # (e.g., incompatible CUDA driver version)
+                    if device != "cpu":
+                        logger.error(
+                            f"Failed to load embedding model on {device}: {e}. "
+                            f"Attempting fallback to CPU."
+                        )
+                        try:
+                            cls._model = SentenceTransformer(settings.EMBEDDING_MODEL, device="cpu")
+                            logger.info("Successfully loaded embedding model on CPU fallback")
+                        except Exception as cpu_error:
+                            logger.error(f"Failed to load embedding model even on CPU: {cpu_error}")
+                            raise
+                    else:
+                        # Already on CPU, can't fallback further
+                        logger.error(f"Failed to load embedding model on CPU: {e}")
+                        raise
 
                 # Enable FP16 on GPU if supported and enabled
                 if settings.EMBEDDING_USE_FP16 and HardwareDetector.supports_fp16():

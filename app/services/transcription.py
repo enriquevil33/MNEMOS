@@ -6,6 +6,7 @@ from typing import List, Dict
 from config.settings import settings
 from app.extensions import db
 from app.models.user_preferences import UserPreferences
+from app.utils.hardware import HardwareDetector
 
 logger = logging.getLogger(__name__)
 
@@ -260,10 +261,35 @@ class TranscriptionService:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-        logger.info(f"Loading Whisper model: {target_model} on {settings.WHISPER_DEVICE}")
-        cls._model = whisper.load_model(target_model, device=settings.WHISPER_DEVICE)
-        cls._current_model_name = target_model
-        return cls._model
+        # Resolve device with validation and fallback
+        device = HardwareDetector.resolve_device(settings.WHISPER_DEVICE)
+
+        logger.info(f"Loading Whisper model: {target_model} on {device}")
+
+        try:
+            cls._model = whisper.load_model(target_model, device=device)
+            cls._current_model_name = target_model
+            return cls._model
+        except Exception as e:
+            # Handle cases where model loading fails despite device validation
+            # (e.g., incompatible CUDA version, driver issues)
+            if device != "cpu":
+                logger.error(
+                    f"Failed to load Whisper model '{target_model}' on {device}: {e}. "
+                    f"Attempting fallback to CPU."
+                )
+                try:
+                    cls._model = whisper.load_model(target_model, device="cpu")
+                    cls._current_model_name = target_model
+                    logger.info(f"Successfully loaded Whisper model '{target_model}' on CPU fallback")
+                    return cls._model
+                except Exception as cpu_error:
+                    logger.error(f"Failed to load Whisper model '{target_model}' even on CPU: {cpu_error}")
+                    raise
+            else:
+                # Already on CPU, can't fallback further
+                logger.error(f"Failed to load Whisper model '{target_model}' on CPU: {e}")
+                raise
 
     @staticmethod
     def save_to_txt(segments: List[Dict], output_path: str):

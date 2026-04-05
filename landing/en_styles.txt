@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="MNEMOS: GraphRAG and semantic indexing with persistent memory and multimodal agentic capabilities. Open source knowledge management system.">
+    <meta name="keywords" content="GraphRAG, knowledge graph, semantic search, RAG, vector database, AI, LLM, open source">
+    <meta name="author" content="qepri">
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://github.com/qepri/MNEMOS">
+    <meta property="og:title" content="MNEMOS: Your Knowledge, Connected">
+    <meta property="og:description" content="GraphRAG and semantic indexing with persistent memory and multimodal agentic capabilities.">
+
+    <title>MNEMOS: Your Knowledge, Connected</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Bodoni+Moda+SC:opsz,wght@6..96,400..900&display=swap" rel="stylesheet">
+
+    <style>
+        /* ============================================
+           MNEMOS Landing Page - CSS Variables & Theme
+           ============================================ */
+
+        :root {
+            /* Fonts */
+            --font-brand: 'Bodoni Moda SC', Georgia, serif;
+            --font-ui: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Monaco, 'Courier New', monospace;
+
+            /* MNEMOS Color Palette */
+            --color-base: #0d0d0d;
+            --color-base-subtle: #171717;
+            --color-panel: #1f1f1f;
+            --color-input: #2a2a2a;
+            --color-hover: #2d2d2d;
+            --color-divider: #2d2d2d;
+
+            --color-primary: #ffffff;
+            --color-secondary: #a0a0a0;
+
+            /* Animated Accent Color */
+            --color-accent-base: #3985ff;
+            --color-accent: hsl(from var(--color-accent-base) h s l);
+            --color-accent-hover: #5a9aff;
+            --color-accent-dark: #1a3571;
+
+            --color-success: #10b981;
+            --color-warning: #f59e0b;
+            --color-purple: #a78bfa;
+
+            /* Spacing */
+            --spacing-xs: 0.5rem;
+            --spacing-sm: 1rem;
+            --spacing-md: 1.5rem;
+            --spacing-lg: 2rem;
+            --spacing-xl: 3rem;
+            --spacing-2xl: 4rem;
+            --spacing-3xl: 6rem;
+
+            /* Shadows */
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.25);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+            --shadow-glow: 0 0 20px rgba(57, 133, 255, 0.3);
+
+            /* Animation */
+            --hue-rotate: 0deg;
+        }
+
+        /* Hue Rotation Animation */
+        @keyframes hue-rotation {
+            0% { --hue-rotate: 0deg; }
+            100% { --hue-rotate: 360deg; }
+        }
+
+        :root {
+            animation: hue-rotation 60s linear infinite;
+        }
+
+        /* Apply hue rotation to accent color elements */
+        .accent-animated {
+            filter: hue-rotate(var(--hue-rotate));
+        }
+
+        /* ============================================
+           Splash Screen
+           ============================================ */
+
+        .splash-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            background-color: var(--color-base);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease-out;
+        }
+
+        .splash-screen.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .splash-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .splash-logo {
+            animation: fade-pulse 2s ease-in-out infinite, hue-rotate-splash 10s linear infinite;
+        }
+
+        .splash-title {
+            font-family: var(--font-brand);
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: var(--color-primary);
+            letter-spacing: 0.1em;
+            animation: pulse 2s ease-in-out infinite;
+            text-shadow: 0 0 30px rgba(57, 133, 255, 0.5);
+        }
+
+        @keyframes fade-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes hue-rotate-splash {
+            0% { filter: hue-rotate(0deg); }
+            100% { filter: hue-rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* ============================================
+           Reset & Base Styles
+           ============================================ */
+
+        * {
+            margin: 0;

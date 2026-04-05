@@ -111,6 +111,65 @@ class HardwareDetector:
         return cls.get_device_info()['supports_fp16']
 
     @classmethod
+    def resolve_device(cls, requested_device: str) -> str:
+        """
+        Resolve a device request to an actual available device.
+
+        Handles 'auto' mode and validates explicitly requested devices.
+        Falls back to CPU if requested device is unavailable.
+
+        Args:
+            requested_device: Device string ('auto', 'cuda', 'mps', 'cpu')
+
+        Returns:
+            str: Actual device to use ('cuda', 'mps', or 'cpu')
+        """
+        # Auto mode - use detected device
+        if requested_device == "auto":
+            device = cls.get_device()
+            logger.info(f"Device auto-detection selected: {device}")
+            return device
+
+        # Explicit device request - validate availability
+        info = cls.get_device_info()
+        available_device = info['device']
+
+        # Check if requested device matches available device
+        if requested_device == available_device:
+            logger.info(f"Using requested device: {requested_device}")
+            return requested_device
+
+        # Requested device not available - check specific cases
+        if requested_device == "cuda":
+            if not torch.cuda.is_available():
+                logger.warning(
+                    f"CUDA requested but not available "
+                    f"(torch.cuda.is_available()=False). "
+                    f"Falling back to {available_device}."
+                )
+                return available_device
+
+        if requested_device == "mps":
+            if not (hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()):
+                logger.warning(
+                    f"MPS requested but not available. "
+                    f"Falling back to {available_device}."
+                )
+                return available_device
+
+        # CPU is always available - if explicitly requested, use it
+        if requested_device == "cpu":
+            logger.info("Using CPU as requested (GPU available but not used)")
+            return "cpu"
+
+        # Unknown device or other edge case - fallback to available
+        logger.warning(
+            f"Unknown or unavailable device '{requested_device}' requested. "
+            f"Falling back to {available_device}."
+        )
+        return available_device
+
+    @classmethod
     def log_hardware_info(cls):
         """Log detailed hardware information."""
         info = cls.get_device_info()
