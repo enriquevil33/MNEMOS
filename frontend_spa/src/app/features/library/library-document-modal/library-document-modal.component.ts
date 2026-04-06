@@ -1,6 +1,7 @@
 import { Component, EventEmitter, Input, Output, inject, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { Document, DocumentSection } from '../../../core/models/document.model';
 import { Collection } from '../../../core/models/collection.model';
 import { DocumentPropertiesFormComponent } from './document-properties-form/document-properties-form.component';
@@ -194,7 +195,14 @@ import { ApiEndpoints } from '../../../core/constants/api-endpoints';
                                                     <div class="flex items-start gap-2">
                                                         <span class="text-primary shrink-0 mt-1">•</span>
                                                         <div class="flex-1">
-                                                            <span class="font-semibold text-gray-200">{{ concept.term }}</span>
+                                                            <div class="flex items-center gap-2 flex-wrap">
+                                                                <button (click)="navigateToWiki(concept.term)" class="font-semibold text-gray-200 hover:text-primary transition-colors text-left">
+                                                                    {{ concept.term }}
+                                                                </button>
+                                                                @if (concept.relevance) {
+                                                                    <span class="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary">{{ concept.relevance }}/10</span>
+                                                                }
+                                                            </div>
                                                             @if (concept.description) {
                                                                 <div class="text-sm text-gray-400 mt-1">
                                                                     <app-markdown-display [content]="concept.description"></app-markdown-display>
@@ -410,7 +418,7 @@ export class LibraryDocumentModalComponent implements OnChanges {
 
   private modalService = inject(ModalService);
 
-  constructor(private http: HttpClient) { }
+  constructor(private http: HttpClient, private router: Router) { }
 
   ngOnChanges(changes: SimpleChanges): void {
     // Load sections when document changes and modal opens
@@ -702,7 +710,7 @@ export class LibraryDocumentModalComponent implements OnChanges {
     }
   }
 
-  getKeyConcepts(): Array<{ term: string; description?: string }> | null {
+  getKeyConcepts(): Array<{ term: string; description?: string; relevance?: number }> | null {
     let concepts: any[] | null = null;
 
     // First, try document-level metadata
@@ -720,7 +728,7 @@ export class LibraryDocumentModalComponent implements OnChanges {
 
     // If not found in document metadata, aggregate from sections
     if (!concepts && this.sections.length > 0) {
-      const allConcepts: string[] = [];
+      const allConcepts: any[] = [];
       this.sections.forEach(section => {
         if (section.metadata) {
           const sectionMeta = section.metadata as any;
@@ -732,20 +740,40 @@ export class LibraryDocumentModalComponent implements OnChanges {
         }
       });
 
-      // Remove duplicates
+      // Remove duplicates and transform to expected format
       if (allConcepts.length > 0) {
-        concepts = [...new Set(allConcepts)];
+        const uniqueConcepts = new Map<string, any>();
+        allConcepts.forEach(concept => {
+          const name = typeof concept === 'string' ? concept : concept.name;
+          if (name && !uniqueConcepts.has(name)) {
+            uniqueConcepts.set(name, concept);
+          }
+        });
+        concepts = Array.from(uniqueConcepts.values());
       }
     }
 
     if (!concepts || concepts.length === 0) return null;
 
-    // Transform simple string arrays into objects
+    // Transform concepts to expected format
     return concepts.map(item => {
       if (typeof item === 'string') {
         return { term: item, description: undefined };
       }
+      // Transform objects with 'name' property to use 'term' instead
+      if (item.name) {
+        return {
+          term: item.name,
+          description: item.description || undefined,
+          relevance: item.relevance
+        };
+      }
+      // Return as-is if it already has 'term' property
       return item;
     });
+  }
+
+  navigateToWiki(conceptName: string): void {
+    this.router.navigate(['/wiki', conceptName]);
   }
 }
