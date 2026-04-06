@@ -1,0 +1,118 @@
+{
+  "en": {
+    "tagline": "Context Daemon",
+    "title": "Your Knowledge, Connected",
+    "subtitle": "GraphRAG and semantic indexing with persistent memory and multimodal agentic capabilities.",
+    "description": "MNEMOS integrates a Reasoning Engine and Hypergraph Extraction to understand complex relationships across PDFs, audio, video, images, and YouTube content.",
+    "stats": [
+      { "icon": "files", "label": "Ingest Any Format" },
+      { "icon": "lock", "label": "Your Data, Your Server" },
+      { "icon": "robot", "label": "Bring Your Own LLM" }
+    ],
+    "demo": "Demo Coming Soon",
+    "cta_primary": "Get Started →",
+    "cta_secondary": "View on GitHub",
+    "features_title": "Core Capabilities",
+    "features_subtitle": "A complete knowledge management system with advanced AI-powered features.",
+    "features": [
+      {
+        "title": "Multimodal Processing",
+        "description": "Ingest and analyze content from any source with intelligent extraction."
+      },
+      {
+        "title": "GraphRAG & Reasoning",
+        "description": "Navigate complex knowledge structures and discover non-obvious connections."
+      },
+      {
+        "title": "Hybrid Search",
+        "description": "Combine vector similarity and keyword matching for precise retrieval."
+      },
+      {
+        "title": "Flexible AI",
+        "description": "Connect to any LLM provider or run models locally with complete control."
+      }
+    ],
+    "use_cases_title": "Use Cases",
+    "use_cases": [
+      {
+        "title": "Research & Academia",
+        "description": "Analyze papers, extract concepts, and discover connections across your library."
+      },
+      {
+        "title": "Enterprise Knowledge",
+        "description": "Build a centralized knowledge repository with persistent memory."
+      },
+      {
+        "title": "Learning & Education",
+        "description": "Process videos, PDFs, and notes into an intelligent study assistant."
+      },
+      {
+        "title": "Technical Docs",
+        "description": "Navigate complex documentation with hypergraph reasoning."
+      }
+    ],
+    "quickstart_title": "Quick Start",
+    "quickstart_code": "# Clone the repository\ngit clone https://github.com/qepri/MNEMOS.git\ncd MNEMOS\n\n# Run the one-click installer (Windows)\ninstaller.bat\n\n# Or use Docker Compose\ndocker-compose up -d\n\n# Access the web interface\nhttp://localhost:5200",
+    "footer": "MNEMOS © 2026 | Built with ❤️ by qepri",
+    "license": "Licensed under GNU AGPLv3",
+    "lang_switch": "🌐 Español"
+  },
+  "es": {
+    "tagline": "Entidad de Contexto",
+    "title": "Tu Conocimiento, Conectado",
+    "subtitle": "GraphRAG e indexación semántica con memoria persistente y capacidades agénticas multimodales.",
+    "description": "MNEMOS integra un Motor de Razonamiento y Extracción de Hipergrafo para entender relaciones complejas en PDFs, audio, video, imágenes y contenido de YouTube.",
+    "stats": [
+      { "icon": "files", "label": "Carga Cualquier Formato" },
+      { "icon": "lock", "label": "Tus Datos, Tu Servidor" },
+      { "icon": "robot", "label": "Trae Tu Propio LLM" }
+    ],
+    "demo": "Demo Próximamente",
+    "cta_primary": "Comenzar →",
+    "cta_secondary": "Ver en GitHub",
+    "features_title": "Capacidades Principales",
+    "features_subtitle": "Un sistema completo de gestión de conocimiento con funciones avanzadas de IA.",
+    "features": [
+      {
+        "title": "Procesamiento Multimodal",
+        "description": "Ingestiona y analiza contenido de cualquier fuente con extracción inteligente."
+      },
+      {
+        "title": "GraphRAG y Razonamiento",
+        "description": "Navega estructuras de conocimiento complejas y descubre conexiones no obvias."
+      },
+      {
+        "title": "Búsqueda Híbrida",
+        "description": "Combina similitud vectorial y coincidencia de palabras clave para recuperación precisa."
+      },
+      {
+        "title": "IA Flexible",
+        "description": "Conéctate a cualquier proveedor LLM o ejecuta modelos localmente con control total."
+      }
+    ],
+    "use_cases_title": "Casos de Uso",
+    "use_cases": [
+      {
+        "title": "Investigación y Academia",
+        "description": "Analiza artículos, extrae conceptos y descubre conexiones en tu biblioteca."
+      },
+      {
+        "title": "Conocimiento Empresarial",
+        "description": "Construye un repositorio de conocimiento centralizado con memoria persistente."
+      },
+      {
+        "title": "Aprendizaje y Educación",
+        "description": "Procesa videos, PDFs y notas en un asistente de estudio inteligente."
+      },
+      {
+        "title": "Documentación Técnica",
+        "description": "Navega documentación compleja con razonamiento de hipergrafo."
+      }
+    ],
+    "quickstart_title": "Inicio Rápido",
+    "quickstart_code": "# Clonar el repositorio\ngit clone https://github.com/qepri/MNEMOS.git\ncd MNEMOS\n\n# Ejecutar el instalador (Windows)\ninstaller.bat\n\n# O usar Docker Compose\ndocker-compose up -d\n\n# Acceder a la interfaz web\nhttp://localhost:5200",
+    "footer": "MNEMOS © 2026 | Hecho con ❤️ por qepri",
+    "license": "Licenciado bajo GNU AGPLv3",
+    "lang_switch": "🌐 English"
+  }
+}

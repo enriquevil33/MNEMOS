@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="MNEMOS: GraphRAG and semantic indexing with persistent memory.">
+    <title>MNEMOS: Your Knowledge, Connected</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&family=Bodoni+Moda+SC:opsz,wght@6..96,400..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/index-lite.css">
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <div class="logo">MNEMOS</div>
+            <ul class="nav-links">
+                <li><a href="https://github.com/qepri/MNEMOS" target="_blank">GitHub</a></li>
+                <li><a href="https://github.com/qepri/MNEMOS#readme" target="_blank">Docs</a></li>
+                <!-- <li><a href="/api/docs/" target="_blank">API</a></li> -->
+                <li><button class="lang-btn" id="langToggle" data-i18n="lang_switch">🌐 Español</button></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="container hero-content">
+                <p class="tagline" data-i18n="tagline"></p>
+                <h1 data-i18n="title"></h1>
+                <p class="subtitle" data-i18n="subtitle"></p>
+                <p class="description" data-i18n="description"></p>
+
+                <div class="stats" id="stats"></div>
+
+                <div class="cta">
+                    <a href="https://github.com/qepri/MNEMOS#installation" class="btn btn-primary" data-i18n="cta_primary"></a>
+                    <a href="https://github.com/qepri/MNEMOS" class="btn btn-secondary" data-i18n="cta_secondary"></a>
+                </div>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="container">
+                <h2 class="section-title" data-i18n="features_title"></h2>
+                <p class="section-subtitle" data-i18n="features_subtitle"></p>
+                <div class="features-grid" id="featuresGrid"></div>
+            </div>
+        </section>
+
+        <section class="use-cases">
+            <div class="container">
+                <h2 class="section-title" data-i18n="use_cases_title"></h2>
+                <div class="use-cases-grid" id="useCasesGrid"></div>
+            </div>
+        </section>
+
+        <section class="quickstart">
+            <div class="container">
+                <h2 class="section-title" data-i18n="quickstart_title"></h2>
+                <div class="code-block">
+                    <pre id="quickstartCode"></pre>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container footer-content">
+            <div class="license">
+                <span data-i18n="license"></span>
+            </div>
+            <p class="copyright" data-i18n="footer"></p>
+        </div>
+    </footer>
+
+    <script>
+        const icons = {
+            files: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>`,
+            headphones: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+                        <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+                    </svg>`,
+            video: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M23 7l-7 5 7 5V7z"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>`,
+            image: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>`,
+            lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>`,
+            robot: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="11" width="18" height="10" rx="2"/>
+                        <circle cx="8.5" cy="16" r="1.5"/>
+                        <circle cx="15.5" cy="16" r="1.5"/>
+                        <path d="M9 11V7a3 3 0 0 1 6 0v4"/>
+                        <line x1="12" y1="11" x2="12" y2="3"/>
+                        <circle cx="12" cy="2" r="1"/>
+                    </svg>`
+        };
+
+        let translations = {};
+        let currentLang = 'en';
+
+        async function loadTranslations() {
+            try {
+                const response = await fetch('assets/translations.json');
+                translations = await response.json();
+                applyTranslations();
+            } catch (error) {
+                console.error('Failed to load translations:', error);
+            }
+        }
+
+        function applyTranslations() {
+            const t = translations[currentLang];
+            if (!t) return;
+
+            // Simple text elements
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (t[key]) {
+                    el.textContent = t[key];
+                }
+            });
+
+            // Stats
+            const statsContainer = document.getElementById('stats');
+            if (statsContainer && t.stats) {
+                statsContainer.innerHTML = t.stats.map(stat => {
+                    const iconSvg = icons[stat.icon] || icons.files;
+                    return `
+                    <div class="stat">
+                        <div class="stat-icon">${iconSvg}</div>
+                        <div class="stat-label">${stat.label}</div>
+                    </div>
+                `}).join('');
+            }
+
+            // Features
+            const featuresGrid = document.getElementById('featuresGrid');
+            if (featuresGrid && t.features) {
+                featuresGrid.innerHTML = t.features.map(feature => `
+                    <div class="feature-card">
+                        <h3>${feature.title}</h3>
+                        <p>${feature.description}</p>
+                    </div>
+                `).join('');
+            }
+
+            // Use Cases
+            const useCasesGrid = document.getElementById('useCasesGrid');
+            if (useCasesGrid && t.use_cases) {
+                useCasesGrid.innerHTML = t.use_cases.map(useCase => `
+                    <div class="use-case">
+                        <h4>${useCase.title}</h4>
+                        <p>${useCase.description}</p>
+                    </div>
+                `).join('');
+            }
+
+            // Quick Start Code Block
+            const quickstartCode = document.getElementById('quickstartCode');
+            if (quickstartCode && t.quickstart_code) {
+                const lines = t.quickstart_code.split('\n');
+                quickstartCode.innerHTML = lines.map(line => {
+                    return line.startsWith('#')
+                        ? `<span class="comment">${line}</span>`
+                        : line;
+                }).join('\n');
+            }
+
+            // Update HTML lang attribute
+            document.documentElement.lang = currentLang;
+
+            // Update page title
+            document.title = `MNEMOS: ${t.title}`;
+        }
+
+        // Language toggle
+        document.getElementById('langToggle').addEventListener('click', () => {
+            currentLang = currentLang === 'en' ? 'es' : 'en';
+            applyTranslations();
+        });
+
+        // Load translations on page load
+        document.addEventListener('DOMContentLoaded', loadTranslations);
+    </script>
+</body>
+</html>
