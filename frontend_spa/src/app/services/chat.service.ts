@@ -25,39 +25,153 @@ export class ChatService {
 
   // Cancellation
   private stop$ = new Subject<void>();
+  private activeReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
   async sendMessage(request: ChatRequest): Promise<ChatResponse | null> {
     this.isLoading.set(true);
 
     try {
-      const response = await firstValueFrom(
-        this.http.post<ChatResponse>(ApiEndpoints.CHAT, request).pipe(
-          takeUntil(this.stop$)
-        )
-      ) as ChatResponse;
-
-      // Update current conversation ID
-      if (response.conversation_id) {
-        this.currentConversationId.set(response.conversation_id);
-      }
-
-      // Add assistant message with simulated streaming
-      await this.addAssistantMessage(response.answer, response.sources, response.search_queries);
-
-      return response;
+      return await this._sendStreaming(request);
     } catch (error) {
       if (this.isLoading()) {
-        console.error('Failed to send message', error);
-        throw error;
+        console.error('Streaming failed, falling back to non-streaming', error);
+        try {
+          return await this._sendNonStreaming(request);
+        } catch (fallbackError) {
+          console.error('Non-streaming fallback also failed', fallbackError);
+          throw fallbackError;
+        }
       }
       return null;
     } finally {
       this.isLoading.set(false);
+      this.activeReader = null;
     }
+  }
+
+  private async _sendStreaming(request: ChatRequest): Promise<ChatResponse | null> {
+    const msgId = `temp-${Date.now()}`;
+
+    // Add empty assistant message immediately
+    const assistantMessage: Message = {
+      id: msgId,
+      conversation_id: this.currentConversationId() || '',
+      role: 'assistant',
+      content: '',
+      sources: [],
+      search_queries: [],
+      created_at: new Date().toISOString(),
+      status: 'generating'
+    };
+    this.messages.update(msgs => [...msgs, assistantMessage]);
+
+    const response = await fetch(ApiEndpoints.CHAT_STREAM, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      // Remove the placeholder and throw so caller can show error
+      this.messages.update(msgs => msgs.filter(m => m.id !== msgId));
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    this.activeReader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let sources: any[] = [];
+    let finalMessageId: string | null = null;
+
+    // Cancel support via stop$
+    const stopPromise = new Promise<void>(resolve => {
+      const sub = this.stop$.subscribe(() => {
+        this.activeReader?.cancel();
+        resolve();
+      });
+    });
+
+    const readLoop = async () => {
+      while (true) {
+        const { done, value } = await this.activeReader!.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() ?? '';
+
+        for (const part of parts) {
+          if (!part.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(part.slice(6));
+
+            if (data.type === 'metadata') {
+              sources = data.sources ?? [];
+              if (data.conversation_id) {
+                this.currentConversationId.set(data.conversation_id);
+                this.messages.update(msgs =>
+                  msgs.map(m => m.id === msgId
+                    ? { ...m, conversation_id: data.conversation_id }
+                    : m)
+                );
+              }
+            } else if (data.type === 'token') {
+              this.messages.update(msgs =>
+                msgs.map(m => m.id === msgId
+                  ? { ...m, content: m.content + data.delta }
+                  : m)
+              );
+            } else if (data.done) {
+              finalMessageId = data.message_id ?? msgId;
+              this.messages.update(msgs =>
+                msgs.map(m => m.id === msgId
+                  ? { ...m, id: finalMessageId!, sources, status: 'completed' }
+                  : m)
+              );
+            } else if (data.type === 'error') {
+              this.messages.update(msgs =>
+                msgs.map(m => m.id === msgId
+                  ? { ...m, content: `Error: ${data.error}`, status: 'error' }
+                  : m)
+              );
+            }
+          } catch {
+            // malformed event — skip
+          }
+        }
+      }
+    };
+
+    await Promise.race([readLoop(), stopPromise]);
+
+    // TTS after stream completes
+    const finalMsg = this.messages().find(m => m.id === (finalMessageId ?? msgId));
+    const prefs = this.settingsService.chatPreferences();
+    if (prefs?.tts_enabled && finalMsg && this.isLoading()) {
+      this.voiceService.speak(finalMsg.content);
+    }
+
+    return null;
+  }
+
+  private async _sendNonStreaming(request: ChatRequest): Promise<ChatResponse | null> {
+    const response = await firstValueFrom(
+      this.http.post<ChatResponse>(ApiEndpoints.CHAT, request).pipe(
+        takeUntil(this.stop$)
+      )
+    ) as ChatResponse;
+
+    if (response.conversation_id) {
+      this.currentConversationId.set(response.conversation_id);
+    }
+
+    await this.addAssistantMessage(response.answer, response.sources, response.search_queries);
+    return response;
   }
 
   cancelGeneration() {
     this.stop$.next();
+    this.activeReader?.cancel();
     this.isLoading.set(false);
   }
 
@@ -83,49 +197,33 @@ export class ChatService {
       id,
       conversation_id: this.currentConversationId() || '',
       role: 'assistant',
-      content: '', // Start empty
+      content: '',
       sources,
       search_queries,
       created_at: new Date().toISOString(),
       status: 'generating'
     };
 
-    // Add empty message first
     this.messages.update(msgs => [...msgs, assistantMessage]);
 
-    // Simulate realistic LLM streaming (approx 40-50 tokens per second)
-    const chunkSize = 2; // Realistically small chunks like a real token
-    const delay = 10; // About 100 updates per second = 200 chars/sec
+    const chunkSize = 2;
+    const delay = 10;
 
     for (let i = 0; i < content.length; i += chunkSize) {
-      // Check for cancellation
       if (!this.isLoading()) break;
-
       const chunk = content.slice(i, i + chunkSize);
-
       this.messages.update(msgs =>
-        msgs.map(msg =>
-          msg.id === id
-            ? { ...msg, content: msg.content + chunk }
-            : msg
-        )
+        msgs.map(msg => msg.id === id ? { ...msg, content: msg.content + chunk } : msg)
       );
-
       await new Promise(resolve => setTimeout(resolve, delay));
     }
 
-    // Mark as completed to reveal sources
     this.messages.update(msgs =>
-      msgs.map(msg =>
-        msg.id === id
-          ? { ...msg, status: 'completed' }
-          : msg
-      )
+      msgs.map(msg => msg.id === id ? { ...msg, status: 'completed' } : msg)
     );
 
-    // TTS
     const prefs = this.settingsService.chatPreferences();
-    if (prefs?.tts_enabled && this.isLoading()) { // Only speak if not cancelled
+    if (prefs?.tts_enabled && this.isLoading()) {
       this.voiceService.speak(content);
     }
   }

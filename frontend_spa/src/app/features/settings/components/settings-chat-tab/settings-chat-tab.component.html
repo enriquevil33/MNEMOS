@@ -34,6 +34,21 @@
             <div class="text-center text-sm font-bold text-accent">{{
                 settingsService.chatPreferences()!.max_context_messages }}</div>
         </div>
+        <div>
+            <label class="block text-sm font-medium mb-2">Retrieval Top-K (1-50 chunks)</label>
+            <input type="range" min="1" max="50" step="1"
+                [(ngModel)]="settingsService.chatPreferences()!.retrieval_top_k"
+                class="range range-accent range-sm mb-2">
+            <div class="flex justify-between text-xs text-secondary">
+                <span>1</span>
+                <span>10</span>
+                <span>25</span>
+                <span>50</span>
+            </div>
+            <div class="text-center text-sm font-bold text-accent">{{
+                settingsService.chatPreferences()!.retrieval_top_k ?? 10 }} chunks</div>
+            <p class="text-xs text-secondary mt-1">Number of document chunks retrieved per query. Higher values improve recall but slow responses.</p>
+        </div>
     </div>
 
     <!-- Web Search Configuration -->

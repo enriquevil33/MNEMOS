@@ -28,6 +28,7 @@ export interface CurrentModelResponse {
 export interface ChatPreferences {
   use_conversation_context: boolean;
   max_context_messages: number;
+  retrieval_top_k?: number;
   selected_system_prompt_id: string | null;
   chunk_size: number;
   chunk_overlap: number;

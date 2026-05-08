@@ -966,7 +966,8 @@ def get_chat_settings():
         "llm_temperature": getattr(prefs, 'llm_temperature', 0.7),
         "llm_top_p": getattr(prefs, 'llm_top_p', 0.9),
         "llm_frequency_penalty": getattr(prefs, 'llm_frequency_penalty', 0.3),
-        "llm_presence_penalty": getattr(prefs, 'llm_presence_penalty', 0.1)
+        "llm_presence_penalty": getattr(prefs, 'llm_presence_penalty', 0.1),
+        "retrieval_top_k": getattr(prefs, 'retrieval_top_k', 10),
     })
 
 
@@ -1105,6 +1106,9 @@ def save_chat_settings():
     # Ollama Context Window
     if 'ollama_num_ctx' in data:
         prefs.ollama_num_ctx = int(data['ollama_num_ctx'])
+
+    if 'retrieval_top_k' in data:
+        prefs.retrieval_top_k = max(1, min(50, int(data['retrieval_top_k'])))
 
     prefs.updated_at = datetime.utcnow()
     db.session.commit()

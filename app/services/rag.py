@@ -1,12 +1,13 @@
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import select, text
-from typing import List, Dict
+from sqlalchemy import select, text, or_
+from sqlalchemy.orm import selectinload
+from typing import List, Dict, Union
 from app.models.chunk import Chunk
 from app.models.document import Document
 from app.models.section import DocumentSection
 from app.models.knowledge_graph import Concept, HyperEdge, HyperEdgeMember
 from app.services.embedder import EmbedderService
-from app.services.llm_client import get_llm_client
+from app.services.llm_client import get_llm_client, LLMError
 import json
 import logging
 
@@ -97,8 +98,8 @@ Output ONLY the queries, one per line. Do not include numbering or bullets."""
         from sqlalchemy import func, desc
         
         # 1. Embed Query
-        query_embedding = self.embedder.embed(query)
-        
+        query_embedding = self.embedder.embed_query(query)
+
         # 2. Detect Language for Search
         pg_lang = self._detect_query_language(query)
         
@@ -119,83 +120,69 @@ Output ONLY the queries, one per line. Do not include numbering or bullets."""
         return [row[0] for row in results]
 
     
-    def _retrieve_via_graph(self, query: str, document_ids: List[str] = None, top_k: int = 3) -> List[DocumentSection]:
+    def _retrieve_via_graph(self, query: str, document_ids: List[str] = None, top_k: int = 3) -> List[Union[DocumentSection, Chunk]]:
         """
-        Retrieves context via Knowledge Graph Traversal:
-        Query -> [Vector Search] -> Similar Concepts -> [HyperEdge] -> Linked Sections
+        Retrieves context via Knowledge Graph Traversal.
+        Returns real DocumentSection and Chunk objects (no fake wrappers).
         """
-        from sqlalchemy import select, desc
-        
-        # 1. Embed Query
-        query_embedding = self.embedder.embed(query)
-        
-        # 2. Find Similar Concepts
-        # We find concepts that are semantically close to the query
+        from sqlalchemy import desc
+
+        query_embedding = self.embedder.embed_query(query)
+
         stmt = select(Concept).order_by(
             Concept.embedding.cosine_distance(query_embedding)
         ).limit(top_k)
-        
         concepts = self.db.execute(stmt).scalars().all()
-        
+
         if not concepts:
             return []
-            
-        print(f"[GraphRAG] Found concepts: {[c.name for c in concepts]}")
-        
-        # 3. Traverse to Sections
-        # Concept -> HyperEdgeMember -> HyperEdge -> Section
-        
-        relevant_sections = []
-        for concept in concepts:
-            # Verify if this concept is actually relevant (distance check could be added here)
-            
-            # Find edges containing this concept
-            # We want edges where this concept is a member
-            # Optimization: Could be done in one join query
-            members = self.db.query(HyperEdgeMember).filter_by(concept_id=concept.id).limit(5).all()
-            
-            for mem in members:
-                edge = self.db.query(HyperEdge).get(mem.hyper_edge_id)
-                if not edge: continue
 
-                # Filter by Document ID if provided
-                if document_ids:
-                    # Check if edge has a source_document_id and if it's in the allowed list
-                    if not edge.source_document_id or str(edge.source_document_id) not in document_ids:
-                         continue
+        logger.info(f"[GraphRAG] Found concepts: {[c.name for c in concepts]}")
 
-                # Case A: Linked to Section (Graph Unifier)
-                if edge.source_section_id:
-                     section = self.db.query(DocumentSection).get(edge.source_section_id)
-                     if section:
-                         relevant_sections.append(section)
-                
-                # Case B: Linked to Chunk (Hypergraph Extractor)
-                elif edge.source_chunk_id:
-                     chunk = self.db.query(Chunk).get(edge.source_chunk_id)
-                     if chunk:
-                         # Create a pseudo-section or wrapper for consistency
-                         # We'll re-use DocumentSection model on the fly or adjust return type?
-                         # Simpler: Just wrap it in a lightweight object or existing Section model with null ID?
-                         # Or better: Just append to a list of "ContentNodes" and adjust return type to List[Any]
-                         
-                         # Hack: Use DocumentSection as a container for now
-                         # Ideally we refactor return type, but to be KISS:
-                         fake_section = DocumentSection(
-                             id=None, # Indicating it's dynamic
-                             title=f"Chunk from {chunk.document.original_filename} (Graph)", 
-                             content=chunk.content,
-                             document_id=chunk.document_id
-                         )
-                         relevant_sections.append(fake_section)
-        
-        # Deduplicate by Content (since IDs might be None for chunks)
-        unique_content = {}
-        for s in relevant_sections:
-            if s.content not in unique_content:
-                unique_content[s.content] = s
-            
-        return list(unique_content.values())
+        stmt = (
+            select(HyperEdgeMember, HyperEdge, DocumentSection, Chunk)
+            .join(HyperEdge, HyperEdge.id == HyperEdgeMember.hyper_edge_id)
+            .outerjoin(DocumentSection, DocumentSection.id == HyperEdge.source_section_id)
+            .outerjoin(Chunk, Chunk.id == HyperEdge.source_chunk_id)
+            .where(HyperEdgeMember.concept_id.in_([c.id for c in concepts]))
+            .limit(5 * len(concepts))
+        )
+        if document_ids:
+            stmt = stmt.where(HyperEdge.source_document_id.in_(document_ids))
+
+        rows = self.db.execute(stmt).all()
+
+        results: List[Union[DocumentSection, Chunk]] = []
+        seen_ids = set()
+        for _mem, _edge, section, chunk in rows:
+            if section is not None and section.id is not None and section.id not in seen_ids:
+                seen_ids.add(section.id)
+                results.append(section)
+            elif chunk is not None and chunk.id is not None and chunk.id not in seen_ids:
+                seen_ids.add(chunk.id)
+                results.append(chunk)
+
+        return results
+
+    def _mmr(self, query_emb: List[float], candidates: List[Chunk], k: int, lam: float = 0.7) -> List[Chunk]:
+        """Maximal Marginal Relevance re-ranking for diversity. λ=0.7 balances relevance vs diversity."""
+        import numpy as np
+        def cos(a, b):
+            a, b = np.array(a), np.array(b)
+            return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-9))
+
+        selected, remaining = [], list(candidates)
+        while remaining and len(selected) < k:
+            best, best_score = None, -1e9
+            for c in remaining:
+                rel = cos(query_emb, c.embedding)
+                div = max((cos(c.embedding, s.embedding) for s in selected), default=0)
+                score = lam * rel - (1 - lam) * div
+                if score > best_score:
+                    best, best_score = c, score
+            selected.append(best)
+            remaining.remove(best)
+        return selected
 
     def search_similar_chunks(
         self,
@@ -204,28 +191,25 @@ Output ONLY the queries, one per line. Do not include numbering or bullets."""
         top_k: int = 10
     ) -> List[Chunk]:
         """
-        Hybrid retrieval via Reciprocal Rank Fusion (RRF).
-        Runs vector and keyword searches independently, each returning top_k results,
-        then merges them by RRF score. This prevents keyword hits from being drowned
-        out by the different score scales of ts_rank vs cosine similarity.
+        Hybrid retrieval via Reciprocal Rank Fusion (RRF) with score floor,
+        MMR diversity re-ranking, and neighbor-window expansion.
         """
         from sqlalchemy import func, desc
-        import logging
-        logger = logging.getLogger(__name__)
 
-        query_embedding = self.embedder.embed(query)
+        query_embedding = self.embedder.embed_query(query)
         pg_lang = self._detect_query_language(query)
 
-        # Convert document_ids strings to UUID objects for proper filtering
         base_filter = None
         if document_ids:
             from uuid import UUID
             uuid_list = [UUID(doc_id) if isinstance(doc_id, str) else doc_id for doc_id in document_ids]
             base_filter = Chunk.document_id.in_(uuid_list)
 
+        eager = selectinload(Chunk.document).selectinload(Document.sections)
+
         # --- Pass 1: Vector search ---
         similarity = 1 - Chunk.embedding.cosine_distance(query_embedding)
-        stmt_vec = select(Chunk)
+        stmt_vec = select(Chunk).options(eager)
         if base_filter is not None:
             stmt_vec = stmt_vec.where(base_filter)
         stmt_vec = stmt_vec.order_by(desc(similarity)).limit(top_k)
@@ -234,10 +218,9 @@ Output ONLY the queries, one per line. Do not include numbering or bullets."""
         # --- Pass 2: Keyword search ---
         kw_query = func.plainto_tsquery(pg_lang, query)
         rank = func.ts_rank_cd(Chunk.search_vector, kw_query)
-        stmt_kw = select(Chunk).add_columns(rank.label("kw_score"))
+        stmt_kw = select(Chunk).options(eager).add_columns(rank.label("kw_score"))
         if base_filter is not None:
             stmt_kw = stmt_kw.where(base_filter)
-        # Only return chunks that actually match the keyword query
         stmt_kw = stmt_kw.where(Chunk.search_vector.op("@@")(kw_query))
         stmt_kw = stmt_kw.order_by(desc(rank)).limit(top_k)
         kw_results = self.db.execute(stmt_kw).all()
@@ -260,9 +243,38 @@ Output ONLY the queries, one per line. Do not include numbering or bullets."""
             scores[cid] = scores.get(cid, 0.0) + 1.0 / (RRF_K + rank_pos + 1)
             chunk_map[cid] = chunk
 
-        # Sort by RRF score descending, return top_k
-        sorted_ids = sorted(scores, key=lambda cid: scores[cid], reverse=True)[:top_k]
-        return [chunk_map[cid] for cid in sorted_ids]
+        sorted_ids = sorted(scores, key=lambda cid: scores[cid], reverse=True)
+
+        # --- 2.5.3: RRF score floor (before MMR/neighbors) ---
+        if scores:
+            top_score = max(scores.values())
+            sorted_ids = [cid for cid in sorted_ids if scores[cid] >= max(0.01, top_score * 0.5)]
+        sorted_ids = sorted_ids[:top_k]
+
+        selected = [chunk_map[cid] for cid in sorted_ids]
+
+        # --- 2.5.2: MMR diversity re-rank ---
+        if len(selected) > 1:
+            selected = self._mmr(query_embedding, selected, k=len(selected))
+
+        # --- 2.5.1: Neighbor-window expansion ---
+        if selected:
+            pairs = set()
+            for c in selected:
+                for delta in (-1, 1):
+                    pairs.add((c.document_id, c.chunk_index + delta))
+            if pairs:
+                conds = [(Chunk.document_id == d) & (Chunk.chunk_index == i) for d, i in pairs]
+                neighbors = self.db.execute(
+                    select(Chunk).options(eager).where(or_(*conds))
+                ).scalars().all()
+                seen = {c.id for c in selected}
+                for n in neighbors:
+                    if n.id not in seen:
+                        n._is_context_neighbor = True
+                        selected.append(n)
+
+        return selected
     
     def query(
         self,
@@ -482,93 +494,78 @@ Provide detailed and comprehensive answers. Use markdown (bold, lists, headers) 
         return f"{minutes}:{secs:02d}"
 
 
-    def _build_hierarchical_context(self, chunks: List[Chunk], graph_sections: List[DocumentSection]):
+    def _build_hierarchical_context(self, chunks: List[Chunk], graph_results: List[Union[DocumentSection, Chunk]]):
         """
         Groups content by Document -> Section -> Chunks to save tokens and provide structure.
+        Accepts real DocumentSection and Chunk objects from graph retrieval (no fake wrappers).
         Returns: (formatted_context_string, sources_list)
         """
-        from collections import defaultdict
-        
-        # Data Structure:
-        # docs[doc_id] = { 'obj': Document, 'sections': { sec_id: {'obj': Section, 'chunks': []} }, 'orphans': [] }
-        docs_map = {} 
+        docs_map = {}
         sources = []
 
-        # 1. Process Graph Sections (High Level Concepts)
-        for section in graph_sections:
-            if not section.document_id: continue # Skip if no doc link (rare)
-            
-            d_id = str(section.document_id)
+        # 1. Process Graph Results (DocumentSection or Chunk)
+        for item in graph_results:
+            if not item.document_id:
+                continue
+
+            d_id = str(item.document_id)
             if d_id not in docs_map:
-                # We need the document object. 
-                # Optimization: It's likely loaded on section.document, or we fetch it.
-                if section.document:
-                    doc = section.document
+                if isinstance(item, DocumentSection):
+                    doc = item.document if item.document else self.db.query(Document).get(item.document_id)
                 else:
-                    # Fallback lookup
-                    doc = self.db.query(Document).get(section.document_id)
+                    doc = item.document if item.document else self.db.query(Document).get(item.document_id)
                 docs_map[d_id] = {'obj': doc, 'sections': {}, 'orphans': []}
-            
-            s_id = str(section.id) if section.id else "virtual_graph_section"
-            if s_id not in docs_map[d_id]['sections']:
-                 docs_map[d_id]['sections'][s_id] = {'obj': section, 'chunks': [], 'is_graph': True}
-            
-            # Graph sections are their own content, often without sub-chunks in this specific flow.
-            # We treat the section content itself as the "chunk".
-            # If it's a "fake_section" from a chunk (see _retrieve_via_graph), it has content.
-            
-            sources.append({
-                "document": doc.original_filename if doc else "Unknown Document",
-                "document_id": str(doc.id) if doc else None,
-                "location": f"Graph Cluster: {section.title}",
-                "text": section.content[:200] + "...",
-                "type": "graph_node"
-            })
+
+            if isinstance(item, DocumentSection):
+                s_id = str(item.id)
+                if s_id not in docs_map[d_id]['sections']:
+                    docs_map[d_id]['sections'][s_id] = {'obj': item, 'chunks': [], 'is_graph': True}
+                doc = docs_map[d_id]['obj']
+                sources.append({
+                    "document": doc.original_filename if doc else "Unknown Document",
+                    "document_id": str(doc.id) if doc else None,
+                    "location": f"Graph Cluster: {item.title}",
+                    "text": (item.content or "")[:200] + "...",
+                    "type": "graph_node"
+                })
+            else:
+                # Chunk from graph — add as orphan tagged graph_chunk
+                docs_map[d_id]['orphans'].append(item)
+                doc = docs_map[d_id]['obj']
+                sources.append({
+                    "document": doc.original_filename if doc else "Unknown Document",
+                    "document_id": str(doc.id) if doc else None,
+                    "chunk_id": str(item.id),
+                    "location": f"[Page {item.page_number}]" if item.page_number else "",
+                    "text": item.content[:200] + "...",
+                    "type": "graph_chunk"
+                })
 
 
-        # 2. Process Standard Chunks
-        # We need to map chunks to sections.
-        # Efficient way: For each doc, fetch its sections once, then map chunks.
-        
-        # First, ensure all docs are in map
-        chunk_docs = {c.document_id: c.document for c in chunks}
-        for d_id, doc in chunk_docs.items():
+        # 2. Process Standard Chunks (document + sections already eager-loaded)
+        for d_id, doc in {c.document_id: c.document for c in chunks}.items():
             if str(d_id) not in docs_map:
                 docs_map[str(d_id)] = {'obj': doc, 'sections': {}, 'orphans': []}
 
-        # Pre-fetch sections for these docs to allow mapping
-        # We can utilize the relationship doc.sections if available, or query.
-        # Assuming eager load or reasonable lazy load for now.
-        
         for chunk in chunks:
             d_id = str(chunk.document_id)
             doc_data = docs_map[d_id]
-            
-            # Find which section this chunk belongs to
-            parent_section = None
-            
-            # Iterate through existing sections in our map FIRST (maybe graph brought them in)
-            # Then check other sections of the doc.
-            # To be efficient: just check the doc's section list.
-            
+            is_neighbor = getattr(chunk, '_is_context_neighbor', False)
+
             found = False
             if chunk.page_number:
-                # Naive search in doc's sections
-                # In prod: use interval tree or optimized query. Here: loop is fine for standard doc retrieval (5 docs)
                 for sec in doc_data['obj'].sections:
                     if sec.start_page and sec.end_page and sec.start_page <= chunk.page_number <= sec.end_page:
                         s_id = str(sec.id)
                         if s_id not in doc_data['sections']:
                             doc_data['sections'][s_id] = {'obj': sec, 'chunks': [], 'is_graph': False}
-                        
                         doc_data['sections'][s_id]['chunks'].append(chunk)
                         found = True
                         break
-            
+
             if not found:
                 doc_data['orphans'].append(chunk)
 
-            # Add to sources
             location = f"[Page {chunk.page_number}]" if chunk.page_number else ""
             sources.append({
                 "document": chunk.document.original_filename,
@@ -576,7 +573,7 @@ Provide detailed and comprehensive answers. Use markdown (bold, lists, headers) 
                 "chunk_id": str(chunk.id),
                 "location": location,
                 "text": chunk.content,
-                "type": "chunk",
+                "type": "context" if is_neighbor else "chunk",
                 "metadata": chunk.document.metadata_
             })
             
@@ -635,3 +632,91 @@ Provide detailed and comprehensive answers. Use markdown (bold, lists, headers) 
             context_lines.append("\n") # separator between docs
 
         return "\n".join(context_lines), sources
+
+    def stream_query(
+        self,
+        question: str,
+        document_ids: List[str] = None,
+        top_k: int = 10,
+        conversation_history: List = None,
+        system_prompt: str = None,
+        web_search: bool = False,
+        use_graph_rag: bool = False,
+    ):
+        """
+        Generator that performs retrieval then streams LLM tokens.
+        Yields dicts:
+          {"type": "metadata", "sources": [...], "search_queries": [...]}
+          {"type": "token", "delta": "..."}
+          {"type": "done", "answer": "<full accumulated text>"}
+        """
+        import time
+
+        search_queries = []
+        chunks = []
+        if document_ids:
+            chunks = self.search_similar_chunks(question, document_ids, top_k)
+
+        graph_sections = []
+        if use_graph_rag:
+            graph_sections = self._retrieve_via_graph(question, document_ids=document_ids, top_k=3)
+
+        rag_context, sources = self._build_hierarchical_context(chunks, graph_sections)
+
+        if web_search:
+            from app.services.web_search import WebSearchService
+            search_service = WebSearchService()
+            search_queries = self._generate_search_queries(question, conversation_history)
+            all_web_context = []
+            for q in search_queries:
+                web_results = search_service.search(q)
+                if web_results["context"]:
+                    all_web_context.append(f"Query: {q}\n{web_results['context']}")
+                    sources.extend(web_results["sources"])
+            if all_web_context:
+                rag_context += "\n\n=== WEB SEARCH RESULTS ===\n" + "\n\n".join(all_web_context)
+
+        yield {"type": "metadata", "sources": sources, "search_queries": search_queries}
+
+        conversation_context = ""
+        if conversation_history:
+            history_lines = []
+            for msg in conversation_history:
+                role_label = "User" if msg.role == "user" else "Assistant"
+                history_lines.append(f"[Previous {role_label}]: {msg.content}")
+            conversation_context = "\n".join(history_lines)
+
+        if not system_prompt:
+            if rag_context:
+                system_prompt = """You are a helpful assistant that answers questions based ONLY on the provided context.
+If the information is not in the context, say so.
+Always cite the sources using the strict format: [Source: filename] when relevant.
+Provide detailed and comprehensive answers. Use markdown (bold, lists, headers) to structure your response."""
+            else:
+                system_prompt = """You are a helpful assistant. Answer the user's questions to the best of your ability.
+Provide detailed and comprehensive answers. Use markdown (bold, lists, headers) to structure your response."""
+
+        from app.models.user_preferences import UserPreferences
+        from app.models.memory import UserMemory
+        prefs = self.db.query(UserPreferences).first()
+        if prefs and prefs.memory_enabled:
+            memories = self.db.query(UserMemory).all()
+            if memories:
+                mem_text = "\n".join([f"- {m.content}" for m in memories])
+                system_prompt += f"\n\nUser Profile / Memories:\n{mem_text}"
+
+        user_prompt_parts = []
+        if conversation_context:
+            user_prompt_parts.append(f"Previous Conversation:\n{conversation_context}\n")
+        if rag_context:
+            user_prompt_parts.append(f"Context from Documents and Web:\n{rag_context}\n")
+        user_prompt_parts.append(f"Current Question: {question}\n")
+        user_prompt_parts.append("Answer in detail and comprehensively.")
+        user_prompt = "\n".join(user_prompt_parts)
+
+        accumulated = ""
+        for token in self.llm.stream_chat(system=system_prompt, messages=[{"role": "user", "content": user_prompt}]):
+            accumulated += token
+            yield {"type": "token", "delta": token}
+
+        yield {"type": "done", "answer": accumulated}

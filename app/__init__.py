@@ -1,6 +1,6 @@
 from flask import Flask
 from config.settings import settings
-from app.extensions import db, migrate, celery_app
+from app.extensions import db, migrate, celery_app, limiter
 
 def create_app():
     app = Flask(__name__)
@@ -18,6 +18,7 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
     migrate.init_app(app, db)
+    limiter.init_app(app)
     
     # Configure Celery
     celery_app.conf.update(app.config)
@@ -67,7 +68,15 @@ def create_app():
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
-            # Ignore race condition if multiple workers try to create it
+            pass
+
+        try:
+            db.session.execute(text(
+                "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS retrieval_top_k INTEGER NOT NULL DEFAULT 10"
+            ))
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
             pass
         
         try:

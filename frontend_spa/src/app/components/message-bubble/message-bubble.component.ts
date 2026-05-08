@@ -96,21 +96,36 @@ import { ToastrService } from 'ngx-toastr';
           @if (message().sources && message().sources!.length > 0 && (!message().status || message().status === 'completed')) {
             <div class="mt-4 pt-3 border-t border-divider" [class.anime-fade-in]="message().status === 'completed'">
               <p class="text-xs font-medium text-secondary mb-2">
-                Sources ({{ message().sources!.length }})
+                Sources ({{ message().sources!.filter(s => s.type !== 'context').length }}
+                @if (message().sources!.filter(s => s.type === 'context').length > 0) {
+                  <span class="opacity-50"> + {{ message().sources!.filter(s => s.type === 'context').length }} context</span>
+                })
               </p>
               <div class="space-y-2">
-                @for (source of message().sources; track source.document) {
-                  <div 
-                    class="text-xs bg-panel p-3 rounded-lg border border-divider cursor-pointer hover:bg-hover transition-colors"
+                @for (source of message().sources; track source.document + source.location) {
+                  <div
+                    [class]="source.type === 'context'
+                      ? 'text-xs bg-panel/50 p-2 rounded-lg border border-divider/50 cursor-pointer hover:bg-hover transition-colors opacity-60 hover:opacity-100'
+                      : 'text-xs bg-panel p-3 rounded-lg border border-divider cursor-pointer hover:bg-hover transition-colors'"
                     (click)="openSourceModal(source)">
-                    <div class="font-semibold text-primary mb-1 flex items-center justify-between">
-                      <span class="truncate pr-2">{{ source.document }}</span>
-                      @if (source.location) {
-                        <span class="opacity-70 font-normal shrink-0">{{ source.location }}</span>
-                      }
+                    <div class="font-semibold text-primary mb-1 flex items-center justify-between gap-2">
+                      <span class="truncate">{{ source.document }}</span>
+                      <div class="flex items-center gap-1 shrink-0">
+                        @if (source.type === 'graph_node' || source.type === 'graph_chunk') {
+                          <span class="text-accent opacity-70 text-xs">🕸</span>
+                        }
+                        @if (source.type === 'context') {
+                          <span class="text-secondary opacity-60 text-xs">ctx</span>
+                        }
+                        @if (source.location) {
+                          <span class="opacity-70 font-normal">{{ source.location }}</span>
+                        }
+                      </div>
                     </div>
                     <div class="text-secondary line-clamp-2">{{ source.text }}</div>
-                    <div class="text-secondary opacity-70 mt-1">Score: {{ formatScore(source.score) }}</div>
+                    @if (source.type !== 'context') {
+                      <div class="text-secondary opacity-70 mt-1">Score: {{ formatScore(source.score) }}</div>
+                    }
                   </div>
                 }
               </div>

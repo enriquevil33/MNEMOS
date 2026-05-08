@@ -1,6 +1,7 @@
 export const ApiEndpoints = {
   // Chat
   CHAT: '/api/chat',
+  CHAT_STREAM: '/api/chat/stream',
 
   // Documents
   DOCUMENTS: '/api/documents',

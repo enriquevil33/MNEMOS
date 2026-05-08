@@ -19,6 +19,7 @@ class UserPreferences(db.Model):
     # RAG Settings
     chunk_size = db.Column(db.Integer, default=1024, nullable=False)
     chunk_overlap = db.Column(db.Integer, default=100, nullable=False)
+    retrieval_top_k = db.Column(db.Integer, default=10, nullable=False)
     
     # Persistence
     selected_llm_model = db.Column(db.String(255), nullable=True)
@@ -78,6 +79,7 @@ class UserPreferences(db.Model):
             'active_connection_id': str(self.active_connection_id) if self.active_connection_id else None,
             'chunk_size': self.chunk_size,
             'chunk_overlap': self.chunk_overlap,
+            'retrieval_top_k': self.retrieval_top_k,
             'selected_llm_model': self.selected_llm_model,
             'whisper_model': self.whisper_model,
             'llm_provider': self.llm_provider,

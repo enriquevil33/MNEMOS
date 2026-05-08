@@ -1,4 +1,5 @@
 flask>=3.0
+flask-limiter[redis]
 gunicorn
 python-dotenv
 sqlalchemy>=2.0

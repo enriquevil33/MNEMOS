@@ -292,6 +292,55 @@ class LLMClient:
             raise LLMError(str(e))
 
 
+    def stream_chat(self, system: str, messages: list, model: str = None):
+        """
+        Generator that yields string token deltas.
+        Falls back to yielding the full response as a single token for providers
+        that don't support streaming.
+        """
+        active_model = model or model_manager.get_model() or self.model
+
+        try:
+            prefs = db.session.query(UserPreferences).first()
+            max_tokens = prefs.llm_max_tokens if prefs else 4096
+            temperature = prefs.llm_temperature if prefs else 0.7
+            top_p = prefs.llm_top_p if prefs else 0.9
+            freq_penalty = prefs.llm_frequency_penalty if prefs else 0.3
+            pres_penalty = prefs.llm_presence_penalty if prefs else 0.1
+        except Exception:
+            max_tokens, temperature, top_p, freq_penalty, pres_penalty = 4096, 0.7, 0.9, 0.3, 0.1
+
+        try:
+            if self.provider == LLMProvider.ANTHROPIC:
+                with self.client.messages.stream(
+                    model=active_model,
+                    max_tokens=max_tokens,
+                    system=system,
+                    messages=messages
+                ) as stream:
+                    for text in stream.text_stream:
+                        yield text
+            else:
+                full_messages = [{"role": "system", "content": system}] + messages
+                response = self.client.chat.completions.create(
+                    model=active_model,
+                    messages=full_messages,
+                    stream=True,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    top_p=top_p,
+                    frequency_penalty=freq_penalty,
+                    presence_penalty=pres_penalty,
+                )
+                for chunk in response:
+                    delta = chunk.choices[0].delta.content
+                    if delta:
+                        yield delta
+        except Exception as e:
+            logger.error(f"Error streaming from LLM: {str(e)}", exc_info=True)
+            raise LLMError(str(e))
+
+
 _thread_local = threading.local()
 
 

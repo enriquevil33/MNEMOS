@@ -31,6 +31,7 @@ export interface MessageSource {
   score: number;
   location?: string;
   metadata?: any;
+  type?: 'chunk' | 'context' | 'graph_node' | 'graph_chunk' | 'web';
 }
 
 export interface ConversationDetail {

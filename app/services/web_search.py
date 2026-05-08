@@ -2,6 +2,7 @@ import requests
 import logging
 from typing import List, Dict, Any, Optional
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from ddgs import DDGS
 from app.extensions import db
 from app.models.user_preferences import UserPreferences
@@ -38,46 +39,43 @@ class DuckDuckGoProvider(SearchProvider):
         return self._format_results(results)
 
     def _format_results(self, results):
-        context_parts = []
+        context_parts = [None] * len(results)
         sources_metadata = []
-        
-        # We will attempt to scrape content for the top 2 results to provide deeper context
-        # Ideally this should be a shared utility, but for now we'll inline it to keep providers self-contained or use a mixin
-        MAX_SCRAPE = 2
-        
-        for i, res in enumerate(results):
+
+        def scrape_result(idx_res):
+            i, res = idx_res
             title = res.get('title', 'No Title')
             href = res.get('href', '')
             snippet = res.get('body', '')
-            
-            content = snippet
-            is_full_content = False
-            
-            # Scrape top results (Simple inline version of previous logic)
-            if i < MAX_SCRAPE and href:
-                scraped = self._scrape(href)
-                if scraped:
-                    content = scraped
-                    is_full_content = True
-            
-            source_label = f"[Web Source {i+1}: {title}]({href})"
-            if is_full_content:
-                context_parts.append(f"{source_label}\n(Full Content Extracted):\n{content}")
-            else:
-                context_parts.append(f"{source_label}\n(Snippet):\n{content}")
+            scraped = self._scrape(href) if href else None
+            return i, title, href, snippet, scraped
 
-            sources_metadata.append({
-                "document": f"Web: {title}",
-                "location": href,
-                "text": snippet[:300] + "...",
-                "file_type": "web",
-                "score": 1.0 if i == 0 else 0.8,
-                "document_id": f"web_{i}",
-                "metadata": {"url": href}
-            })
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(scrape_result, (i, res)): i for i, res in enumerate(results)}
+            for future in as_completed(futures):
+                try:
+                    i, title, href, snippet, scraped = future.result()
+                    content = scraped if scraped else snippet
+                    is_full = scraped is not None
+                    source_label = f"[Web Source {i+1}: {title}]({href})"
+                    label = "Full Content Extracted" if is_full else "Snippet"
+                    context_parts[i] = f"{source_label}\n({label}):\n{content}"
+                    sources_metadata.append((i, {
+                        "document": f"Web: {title}",
+                        "location": href,
+                        "text": snippet[:300] + "...",
+                        "file_type": "web",
+                        "score": 1.0 if i == 0 else 0.8,
+                        "document_id": f"web_{i}",
+                        "metadata": {"url": href}
+                    }))
+                except Exception as e:
+                    logger.warning(f"Scrape failed: {e}")
 
-        formatted = "\n\n=== WEB SEARCH RESULTS (DuckDuckGo) ===\n" + "\n\n".join(context_parts) + "\n==========================\n"
-        return {"context": formatted, "sources": sources_metadata}
+        sources_metadata.sort(key=lambda x: x[0])
+        valid_parts = [p for p in context_parts if p]
+        formatted = "\n\n=== WEB SEARCH RESULTS (DuckDuckGo) ===\n" + "\n\n".join(valid_parts) + "\n==========================\n"
+        return {"context": formatted, "sources": [s for _, s in sources_metadata]}
 
     def _scrape(self, url):
         try:

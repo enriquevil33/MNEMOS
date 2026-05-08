@@ -1,17 +1,19 @@
-from flask import Blueprint, request, render_template, jsonify
+from flask import Blueprint, request, render_template, jsonify, Response, stream_with_context
 from app.services.rag import RAGService
 from app.services.embedder import EmbedderService
 from app.services.llm_client import LLMError
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models.conversation import Conversation, Message
 from app.models.user_preferences import UserPreferences, SystemPrompt
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('chat', __name__, url_prefix='/api/chat')
 
 @bp.route('/', methods=['POST'])
+@limiter.limit("30 per minute")
 def chat():
     """Chat endpoint with RAG and conversation context support."""
     # Handle both multipart/form-data (HTMX) and JSON
@@ -86,12 +88,13 @@ def chat():
     use_graph_rag = data.get('use_graph_rag', False) if request.is_json else False
 
     # Perform RAG with conversation context
+    top_k = max(1, min(50, getattr(prefs, 'retrieval_top_k', 10)))
     rag = RAGService(db.session)
     try:
         result = rag.query(
             question=question,
             document_ids=doc_ids,
-            top_k=10,
+            top_k=top_k,
             conversation_history=conversation_history,
             system_prompt=system_prompt,
             web_search=web_search,
@@ -130,7 +133,7 @@ def chat():
         except Exception as e:
             logger.error(f"Failed to trigger memory task: {e}")
 
-    if request.headers.get('HX-Request'):
+    if request.headers.get('HX-Request'):  # noqa: RET505
         return render_template(
             'partials/chat_messages.html',
             question=question,
@@ -144,3 +147,107 @@ def chat():
     response = result
     response['conversation_id'] = str(conversation.id)
     return jsonify(response)
+
+
+@bp.route('/stream', methods=['POST'])
+@limiter.limit("30 per minute")
+def chat_stream():
+    """SSE streaming chat endpoint. Same interface as POST /, returns text/event-stream."""
+    data = request.json or {}
+    question = data.get('question')
+    doc_ids = data.get('document_ids', [])
+    conversation_id = data.get('conversation_id')
+    web_search = data.get('web_search', False)
+    use_graph_rag = data.get('use_graph_rag', False)
+
+    if not question:
+        return jsonify({"error": "Question required"}), 400
+
+    prefs = db.session.query(UserPreferences).first()
+    if not prefs:
+        prefs = UserPreferences(use_conversation_context=True, max_context_messages=10)
+        db.session.add(prefs)
+        db.session.commit()
+
+    conversation = None
+    if conversation_id:
+        conversation = db.session.query(Conversation).get(conversation_id)
+        if not conversation:
+            return jsonify({"error": "Conversation not found"}), 404
+    else:
+        title = question[:80] + "..." if len(question) > 80 else question
+        conversation = Conversation(title=title)
+        db.session.add(conversation)
+        db.session.commit()
+
+    user_msg = Message(conversation_id=conversation.id, role='user', content=question)
+    db.session.add(user_msg)
+    db.session.commit()
+
+    conversation_history = []
+    if prefs.use_conversation_context and conversation_id:
+        history_msgs = db.session.query(Message).filter(
+            Message.conversation_id == conversation.id,
+            Message.id != user_msg.id
+        ).order_by(Message.created_at.desc()).limit(prefs.max_context_messages).all()
+        conversation_history = list(reversed(history_msgs))
+
+    system_prompt = None
+    if prefs.selected_system_prompt_id:
+        prompt_obj = db.session.query(SystemPrompt).get(prefs.selected_system_prompt_id)
+        if prompt_obj:
+            system_prompt = prompt_obj.content
+
+    conv_id = str(conversation.id)
+
+    top_k_stream = max(1, min(50, getattr(prefs, 'retrieval_top_k', 10)))
+
+    @stream_with_context
+    def generate():
+        rag = RAGService(db.session)
+        accumulated = ""
+        sources = []
+        try:
+            for event in rag.stream_query(
+                question=question,
+                document_ids=doc_ids,
+                top_k=top_k_stream,
+                conversation_history=conversation_history,
+                system_prompt=system_prompt,
+                web_search=web_search,
+                use_graph_rag=use_graph_rag,
+            ):
+                if event["type"] == "metadata":
+                    sources = event.get("sources", [])
+                    payload = {
+                        "type": "metadata",
+                        "sources": sources,
+                        "search_queries": event.get("search_queries", []),
+                        "conversation_id": conv_id,
+                    }
+                    yield f"data: {json.dumps(payload)}\n\n"
+                elif event["type"] == "token":
+                    accumulated += event["delta"]
+                    yield f"data: {json.dumps({'type': 'token', 'delta': event['delta']})}\n\n"
+                elif event["type"] == "done":
+                    accumulated = event.get("answer", accumulated)
+
+            # Persist assistant message after stream completes
+            assistant_msg = Message(
+                conversation_id=conversation.id,
+                role='assistant',
+                content=accumulated,
+                sources=sources,
+                search_queries=[],
+            )
+            db.session.add(assistant_msg)
+            conversation.updated_at = db.func.now()
+            db.session.commit()
+
+            yield f"data: {json.dumps({'type': 'done', 'done': True, 'message_id': str(assistant_msg.id)})}\n\n"
+
+        except LLMError as e:
+            logger.error(f"LLM stream error: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream')

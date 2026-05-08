@@ -6,9 +6,17 @@ import numpy as np
 import openai
 import logging
 import time
+import functools
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
+
+
+@functools.lru_cache(maxsize=512)
+def _cached_embed_query(text: str) -> List[float]:
+    """Module-level cached embedding for single query strings."""
+    return EmbedderService().embed(text)
+
 
 class EmbedderService:
     _model = None
@@ -80,6 +88,10 @@ class EmbedderService:
 
                 cls._client = openai.OpenAI(base_url=base_url, api_key=api_key)
             return cls._client
+
+    def embed_query(self, text: str) -> List[float]:
+        """Embed a single query string with LRU caching (normalized for cache hits)."""
+        return _cached_embed_query(text.strip().lower())
 
     def embed(self, texts: Union[str, List[str]]) -> Union[List[float], List[List[float]]]:
         """
