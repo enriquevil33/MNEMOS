@@ -7,7 +7,7 @@ from app.services.chunker import ChunkerService
 from app.services.epub_processor import EpubProcessor
 from app.services.embedder import EmbedderService
 from app.services.youtube import YouTubeService
-from app.services.llm_client import get_llm_client, reset_client
+from app.services.llm_client import get_llm_client
 from config.settings import settings
 from app.utils.archive import archive_file
 import os
@@ -32,9 +32,6 @@ def process_document_task(self, document_id: str):
     with app.app_context():
         try:
             logger.info(f"Starting processing for document {document_id}")
-            
-            # Ensure Worker picks up latest LLM settings from DB
-            reset_client()
             
             doc = db.session.get(Document, UUID(document_id))
             if not doc:
@@ -240,32 +237,40 @@ def process_document_task(self, document_id: str):
             texts_to_embed = [c["text"] for c in text_chunks]
             if texts_to_embed:
                 logger.info(f"Generating embeddings for {len(texts_to_embed)} chunks...")
-                doc.processing_progress = 50  # Starting embeddings
+                doc.processing_progress = 50
                 db.session.commit()
 
+                BATCH_SIZE = 100
+                total = len(texts_to_embed)
                 start_time = time.time()
-                embeddings = embedder.embed(texts_to_embed)
+
+                for batch_start in range(0, total, BATCH_SIZE):
+                    batch_texts = texts_to_embed[batch_start:batch_start + BATCH_SIZE]
+                    batch_data = text_chunks[batch_start:batch_start + BATCH_SIZE]
+                    batch_embeddings = embedder.embed(batch_texts)
+
+                    chunk_rows = []
+                    for j, chunk_data in enumerate(batch_data):
+                        chunk_rows.append(Chunk(
+                            document_id=doc.id,
+                            content=chunk_data["text"],
+                            chunk_index=batch_start + j,
+                            start_time=chunk_data.get("start"),
+                            end_time=chunk_data.get("end"),
+                            page_number=chunk_data.get("page"),
+                            embedding=batch_embeddings[j],
+                            language=doc_language
+                        ))
+                    db.session.add_all(chunk_rows)
+                    db.session.flush()
+                    logger.info(f"Saved chunks {batch_start + 1}–{batch_start + len(batch_texts)}/{total}")
 
                 elapsed = time.time() - start_time
-                logger.info(f"Embeddings generated in {elapsed:.2f}s ({len(texts_to_embed)/elapsed:.1f} chunks/sec)")
-                doc.processing_progress = 70  # Embeddings done
+                logger.info(f"Embeddings + save complete in {elapsed:.2f}s ({total/elapsed:.1f} chunks/sec)")
                 db.session.commit()
-
-                # Save chunks to database
-                logger.info("Saving chunks to database...")
-                for i, chunk_data in enumerate(text_chunks):
-                    new_chunk = Chunk(
-                        document_id=doc.id,
-                        content=chunk_data["text"],
-                        chunk_index=i,
-                        start_time=chunk_data.get("start"),
-                        end_time=chunk_data.get("end"),
-                        page_number=chunk_data.get("page"),
-                        embedding=embeddings[i],
-                        language=doc_language # Explicitly set language so trigger works correctly
-                    )
-                    db.session.add(new_chunk)
-                logger.info(f"Saved {len(text_chunks)} chunks to database")
+                doc.processing_progress = 70
+                db.session.commit()
+                logger.info(f"Saved {total} chunks to database")
                 
                 # --- Generate Document Summary (Summary Indexing) ---
                 _generate_summary_logic(doc.id)

@@ -1,6 +1,7 @@
 from flask import Blueprint, request, render_template, jsonify
 from app.services.rag import RAGService
 from app.services.embedder import EmbedderService
+from app.services.llm_client import LLMError
 from app.extensions import db
 from app.models.conversation import Conversation, Message
 from app.models.user_preferences import UserPreferences, SystemPrompt
@@ -47,7 +48,7 @@ def chat():
         if not conversation:
             return jsonify({"error": "Conversation not found"}), 404
     else:
-        title = question[:40] + "..." if len(question) > 40 else question
+        title = question[:80] + "..." if len(question) > 80 else question
         conversation = Conversation(title=title)
         db.session.add(conversation)
         db.session.commit()
@@ -86,16 +87,20 @@ def chat():
 
     # Perform RAG with conversation context
     rag = RAGService(db.session)
-    result = rag.query(
-        question=question,
-        document_ids=doc_ids,
-        top_k=10,
-        conversation_history=conversation_history,
-        system_prompt=system_prompt,
-        web_search=web_search,
-        use_graph_rag=use_graph_rag,
-        images=images
-    )
+    try:
+        result = rag.query(
+            question=question,
+            document_ids=doc_ids,
+            top_k=10,
+            conversation_history=conversation_history,
+            system_prompt=system_prompt,
+            web_search=web_search,
+            use_graph_rag=use_graph_rag,
+            images=images
+        )
+    except LLMError as e:
+        logger.error(f"LLM provider error: {e}")
+        return jsonify({"error": str(e)}), 502
 
     assistant_msg = Message(
         conversation_id=conversation.id,

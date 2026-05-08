@@ -1,9 +1,24 @@
 from flask import Blueprint, request, jsonify
 from app.services.reasoning_engine import ReasoningEngine
+from config.settings import settings
 import logging
+import json
+import redis
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('reasoning', __name__, url_prefix='/api/reasoning')
+
+_redis = redis.from_url(settings.REDIS_URL, decode_responses=True)
+_REPROCESS_KEY = "mnemos:reprocessing_status"
+
+
+def get_reprocessing_status() -> dict:
+    val = _redis.get(_REPROCESS_KEY)
+    return json.loads(val) if val else {"status": "idle"}
+
+
+def set_reprocessing_status(value: dict, ttl: int = 3600):
+    _redis.setex(_REPROCESS_KEY, ttl, json.dumps(value))
 
 @bp.route('/traverse', methods=['POST'])
 def traverse_graph():
@@ -84,30 +99,22 @@ def traverse_graph():
         logger.error(f"Traversal error: {e}")
         return jsonify({"error": str(e)}), 500
 
-# Simple in-memory status tracker for KISS requirement
-# In production with multiple workers, this should be Redis/Database
-REPROCESSING_STATUS = {
-    "status": "idle" # idle, processing
-}
-
 @bp.route('/reprocess', methods=['POST'])
 def reprocess_all():
-    global REPROCESSING_STATUS
-    if REPROCESSING_STATUS["status"] == "processing":
-         return jsonify({"status": "processing", "message": "Already reprocessing..."})
+    current = get_reprocessing_status()
+    if current["status"] == "processing":
+        return jsonify({"status": "processing", "message": "Already reprocessing..."})
 
     data = request.json or {}
     missing_only = data.get('missing_only', False)
 
-    REPROCESSING_STATUS["status"] = "processing"
+    set_reprocessing_status({"status": "processing"})
 
-    # Capture app context for the background thread
     from flask import current_app
     app = current_app._get_current_object()
 
     import threading
     def run_reprocess():
-        global REPROCESSING_STATUS
         with app.app_context():
             try:
                 from app.extensions import db
@@ -117,7 +124,6 @@ def reprocess_all():
                 documents = db.session.query(Document).filter(Document.status == 'completed').all()
 
                 if missing_only:
-                    # Skip documents that already have hyper_edges
                     docs_with_edges = db.session.query(Document.id).filter(
                         Document.hyper_edges.any()
                     ).all()
@@ -125,7 +131,6 @@ def reprocess_all():
                     documents = [d for d in documents if str(d.id) not in already_processed]
                     logger.info(f"Missing-only mode: {len(documents)} documents to process (skipping {len(already_processed)} already extracted).")
                 else:
-                    # Full rebuild: delete all existing hypergraph data first
                     from app.models.knowledge_graph import HyperEdgeMember, HyperEdge, Concept
                     db.session.query(HyperEdgeMember).delete()
                     db.session.query(HyperEdge).delete()
@@ -138,10 +143,10 @@ def reprocess_all():
                     HypergraphExtractor.process_document(str(doc.id))
 
                 logger.info("Reprocessing complete.")
-                REPROCESSING_STATUS["status"] = "completed"
+                set_reprocessing_status({"status": "completed"})
             except Exception as e:
                 logger.error(f"Reprocessing failed: {e}")
-                REPROCESSING_STATUS["status"] = "failed"
+                set_reprocessing_status({"status": "failed", "error": str(e)})
 
     thread = threading.Thread(target=run_reprocess)
     thread.start()
@@ -150,5 +155,4 @@ def reprocess_all():
 
 @bp.route('/reprocess/status', methods=['GET'])
 def get_reprocess_status():
-    global REPROCESSING_STATUS
-    return jsonify(REPROCESSING_STATUS)
+    return jsonify(get_reprocessing_status())

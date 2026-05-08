@@ -7,10 +7,43 @@ from app.models.section import DocumentSection
 from app.models.knowledge_graph import Concept, HyperEdge, HyperEdgeMember
 from app.services.embedder import EmbedderService
 from app.services.llm_client import get_llm_client
-
-from app.services.embedder import EmbedderService
-from app.services.llm_client import get_llm_client
 import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Context window sizes keyed by provider/model prefix (safe defaults)
+_MODEL_CTX = {
+    "gpt-4": 8192,
+    "gpt-4o": 128000,
+    "gpt-3.5": 16385,
+    "claude": 200000,
+    "llama": 4096,
+    "mistral": 32768,
+    "default": 8192,
+}
+
+
+def _count_tokens(text: str, model: str = "") -> int:
+    try:
+        import tiktoken
+        try:
+            enc = tiktoken.encoding_for_model(model)
+        except Exception:
+            enc = tiktoken.get_encoding("cl100k_base")
+        return len(enc.encode(text))
+    except ImportError:
+        # Rough approximation when tiktoken is unavailable
+        return len(text) // 4
+
+
+def _model_ctx_size(model: str) -> int:
+    m = (model or "").lower()
+    for prefix, size in _MODEL_CTX.items():
+        if m.startswith(prefix):
+            return size
+    return _MODEL_CTX["default"]
+
 
 class RAGService:
     def __init__(self, db_session):
@@ -244,12 +277,8 @@ Output ONLY the queries, one per line. Do not include numbering or bullets."""
     ) -> Dict:
         """Executes full RAG flow with optional conversation context."""
         import time
-        import logging
-        
-        # Setup basic logging
-        logging.basicConfig(level=logging.INFO)
-        logger = logging.getLogger(__name__)
 
+        search_queries = []
         start_time = time.time()
         logger.info(f"--- START RAG QUERY: '{question}' ---")
 
@@ -382,15 +411,43 @@ Provide detailed and comprehensive answers. Use markdown (bold, lists, headers) 
 
         user_prompt = "\n".join(user_prompt_parts)
 
+        # Token budget guard: trim lowest-ranked chunks if prompt overflows model context
+        try:
+            _llm_prefs = self.db.query(UserPreferences).first()
+            reserve_tokens = _llm_prefs.llm_max_tokens if _llm_prefs else 4096
+        except Exception:
+            reserve_tokens = 4096
+        model_name = self.llm.model or ""
+        ctx_size = _model_ctx_size(model_name)
+        sys_tokens = _count_tokens(system_prompt, model_name)
+        prompt_tokens = _count_tokens(user_prompt, model_name)
+        budget = ctx_size - reserve_tokens - sys_tokens
+        if prompt_tokens > budget and chunks:
+            dropped = 0
+            # Drop chunks from lowest rank upward until under budget
+            while chunks and prompt_tokens > budget:
+                chunks.pop()
+                dropped += 1
+                rag_context, sources = self._build_hierarchical_context(chunks, graph_sections)
+                user_prompt_parts_new = []
+                if conversation_context:
+                    user_prompt_parts_new.append(f"Previous Conversation:\n{conversation_context}\n")
+                if rag_context:
+                    user_prompt_parts_new.append(f"Context from Documents and Web:\n{rag_context}\n")
+                user_prompt_parts_new.append(f"Current Question: {question}\n")
+                user_prompt_parts_new.append("Answer in detail and comprehensively.")
+                user_prompt = "\n".join(user_prompt_parts_new)
+                prompt_tokens = _count_tokens(user_prompt, model_name)
+            logger.info(f"[Context] Dropped {dropped} chunks to fit token budget ({budget} tokens)")
+
         # Log Context Stats
         ctx_len = len(rag_context) if rag_context else 0
         hist_len = len(conversation_context) if conversation_context else 0
         logger.info(f"[Context] Docs/Web: {ctx_len} chars | History: {hist_len} chars | Prompt Total: {len(user_prompt)} chars")
 
-        # --- LOGGING: Final Prompt ---
-        logger.info("--- FINAL LLM PROMPT ---")
-        logger.info(user_prompt)
-        logger.info("------------------------")
+        logger.debug("--- FINAL LLM PROMPT ---")
+        logger.debug(user_prompt)
+        logger.debug("------------------------")
 
         # 6. Generate response with LLM
         logger.info("[LLM] Sending request to model...")
