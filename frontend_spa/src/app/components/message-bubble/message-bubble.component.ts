@@ -10,7 +10,6 @@ import { ApiEndpoints } from '@core/constants/api-endpoints';
 import { VoiceService } from '@services/voice.service';
 
 import { GraphVisualizerComponent } from '@shared/components/graph-visualizer/graph-visualizer.component';
-import { Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 
 @Component({
@@ -96,25 +95,25 @@ import { ToastrService } from 'ngx-toastr';
           @if (message().sources && message().sources!.length > 0 && (!message().status || message().status === 'completed')) {
             <div class="mt-4 pt-3 border-t border-divider" [class.anime-fade-in]="message().status === 'completed'">
               <p class="text-xs font-medium text-secondary mb-2">
-                Sources ({{ message().sources!.filter(s => s.type !== 'context').length }}
-                @if (message().sources!.filter(s => s.type === 'context').length > 0) {
-                  <span class="opacity-50"> + {{ message().sources!.filter(s => s.type === 'context').length }} context</span>
+                Sources ({{ primarySourceCount() }}
+                @if (contextSourceCount() > 0) {
+                  <span class="opacity-50"> + {{ contextSourceCount() }} context</span>
                 })
               </p>
               <div class="space-y-2">
                 @for (source of message().sources; track source.document + source.location) {
                   <div
-                    [class]="source.type === 'context'
+                    [class]="isContextSource(source)
                       ? 'text-xs bg-panel/50 p-2 rounded-lg border border-divider/50 cursor-pointer hover:bg-hover transition-colors opacity-60 hover:opacity-100'
                       : 'text-xs bg-panel p-3 rounded-lg border border-divider cursor-pointer hover:bg-hover transition-colors'"
                     (click)="openSourceModal(source)">
                     <div class="font-semibold text-primary mb-1 flex items-center justify-between gap-2">
                       <span class="truncate">{{ source.document }}</span>
                       <div class="flex items-center gap-1 shrink-0">
-                        @if (source.type === 'graph_node' || source.type === 'graph_chunk') {
+                        @if (isGraphSource(source)) {
                           <span class="text-accent opacity-70 text-xs">🕸</span>
                         }
-                        @if (source.type === 'context') {
+                        @if (isContextSource(source)) {
                           <span class="text-secondary opacity-60 text-xs">ctx</span>
                         }
                         @if (source.location) {
@@ -123,7 +122,7 @@ import { ToastrService } from 'ngx-toastr';
                       </div>
                     </div>
                     <div class="text-secondary line-clamp-2">{{ source.text }}</div>
-                    @if (source.type !== 'context') {
+                    @if (!isContextSource(source)) {
                       <div class="text-secondary opacity-70 mt-1">Score: {{ formatScore(source.score) }}</div>
                     }
                   </div>
@@ -188,7 +187,6 @@ export class MessageBubbleComponent {
 
   private modalService = inject(ModalService);
   private voiceService = inject(VoiceService);
-  private router = inject(Router);
   private toastr = inject(ToastrService);
 
   // State
@@ -265,6 +263,22 @@ export class MessageBubbleComponent {
       return 'N/A';
     }
     return `${(score * 100).toFixed(1)}%`;
+  }
+
+  primarySourceCount(): number {
+    return (this.message().sources ?? []).filter(s => s.type !== 'context').length;
+  }
+
+  contextSourceCount(): number {
+    return (this.message().sources ?? []).filter(s => s.type === 'context').length;
+  }
+
+  isContextSource(source: MessageSource): boolean {
+    return source.type === 'context';
+  }
+
+  isGraphSource(source: MessageSource): boolean {
+    return source.type === 'graph_node' || source.type === 'graph_chunk';
   }
 
   handleCitation(sourceName: string) {

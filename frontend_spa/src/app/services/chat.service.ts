@@ -50,7 +50,7 @@ export class ChatService {
   }
 
   private async _sendStreaming(request: ChatRequest): Promise<ChatResponse | null> {
-    const msgId = `temp-${Date.now()}`;
+    const msgId = `temp-assistant-${Date.now()}`;
 
     // Add empty assistant message immediately
     const assistantMessage: Message = {
@@ -181,7 +181,7 @@ export class ChatService {
 
   addUserMessage(content: string, images?: string[]) {
     const userMessage: Message = {
-      id: `temp-${Date.now()}`,
+      id: `temp-user-${Date.now()}`,
       conversation_id: this.currentConversationId() || '',
       role: 'user',
       content,
@@ -192,7 +192,7 @@ export class ChatService {
   }
 
   async addAssistantMessage(content: string, sources: any[] = [], search_queries: string[] = []) {
-    const id = `temp-${Date.now()}`;
+    const id = `temp-assistant-${Date.now()}`;
     const assistantMessage: Message = {
       id,
       conversation_id: this.currentConversationId() || '',

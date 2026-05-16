@@ -2,7 +2,6 @@ from app.extensions import db
 from app.models.document import Document
 from app.models.chunk import Chunk
 from app.services.llm_client import get_llm_client, reset_client
-from app.services.embedder import EmbedderService
 import logging
 from uuid import UUID
 import json
@@ -134,35 +133,24 @@ class SummaryService:
             db.session.query(DocumentSection).filter_by(document_id=doc.id).delete()
             
             logger.info(f"Saving {len(merged_sections)} smart sections...")
-            embedder = EmbedderService()
-            
+
             for section_data in merged_sections:
                 title = SummaryService._sanitize_title(section_data.get('title', 'Untitled Section'))
-                content = section_data.get('summary', '') 
+                content = section_data.get('summary', '')
                 if not content: content = f"Section: {title}"
-                
-                # Fetch metadata
+
                 meta = section_data.get('metadata', {})
-                
-                # Embed content
-                embedding = embedder.embed([content])[0]
-                
+
                 section = DocumentSection(
                     document_id=doc.id,
                     title=title,
                     content=content,
                     start_page=section_data.get('start_page'),
                     end_page=section_data.get('end_page'),
-                    embedding=embedding,
-                    metadata_=meta # Save the rich metadata!
+                    metadata_=meta
                 )
                 db.session.add(section)
-            
-            # Embed Final Summary
-            logger.info("Embedding final global summary...")
-            summary_vec = embedder.embed([global_summary])[0]
-            doc.summary_embedding = summary_vec
-            
+
             doc.processing_progress = 90
             db.session.commit()
             

@@ -55,11 +55,23 @@ class HypergraphExtractor:
                     logger.error("No content available for extraction.")
                     return
 
+            # Also process section summaries for concepts the chunk pass may have missed
+            try:
+                from app.models.section import DocumentSection
+                sections = db.session.query(DocumentSection).filter_by(document_id=doc.id).all()
+                for section in sections:
+                    if not section.content:
+                        continue
+                    section_text = f"[Section: {section.title}]\n{section.content}"
+                    batches.append((section_text, None))
+            except Exception as e:
+                logger.warning(f"Section batch preparation failed (non-blocking): {e}")
+
             llm = get_llm_client()
             embedder = EmbedderService()
 
             total_events = 0
-            
+
             # 2. Process Batches
             for i, batch_data in enumerate(batches):
                 context_text, first_chunk_id = batch_data
@@ -237,8 +249,14 @@ class HypergraphExtractor:
                             concept.description = final_def
                             db.session.add(concept)
                             logger.info(f"Updated definition for '{norm_name}'")
-                    # Note: We don't create concepts just from definitions, we wait for events to link them.
-                    # Or should we? Better to wait for usage in an edge to avoid orphan noise.
+                    else:
+                        # Create concept immediately so definitions aren't lost
+                        concept = Concept(name=norm_name)
+                        concept.description = final_def
+                        concept.embedding = embedder.embed([norm_name])[0]
+                        db.session.add(concept)
+                        db.session.flush()
+                        logger.info(f"Created concept '{norm_name}' from definition")
 
                 # 4. Process Events
                 for edge_item in events:
@@ -308,7 +326,6 @@ class HypergraphExtractor:
                         source_document_id=doc.id,
                         source_chunk_id=first_chunk_id
                     )
-                    hyper_edge.embedding = embedder.embed([description])[0]
                     db.session.add(hyper_edge)
                     db.session.flush()
                     

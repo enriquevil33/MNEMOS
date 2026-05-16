@@ -1,11 +1,9 @@
 from sqlalchemy import Column, String, Text, Integer, ForeignKey, Index, DateTime
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
-from pgvector.sqlalchemy import Vector
 from uuid import uuid4
 from datetime import datetime
 from app.extensions import db
-from config.settings import settings
 
 class DocumentSection(db.Model):
     __tablename__ = 'document_sections'
@@ -18,9 +16,6 @@ class DocumentSection(db.Model):
     start_page = Column(Integer)
     end_page = Column(Integer)
     
-    # Vector for semantic search (HNSW index applied below)
-    embedding = Column(Vector(settings.EMBEDDING_DIMENSION))
-    
     # New Metadata for improved granularity
     metadata_ = Column(JSONB) # e.g. { "key_concepts": [], "source_map": [] }
     
@@ -30,11 +25,6 @@ class DocumentSection(db.Model):
     document = relationship('app.models.document.Document', backref=db.backref('sections', cascade='all, delete-orphan'))
 
     __table_args__ = (
-        # HNSW Index for fast vector search
-        Index('ix_document_sections_embedding', embedding, postgresql_using='hnsw',
-              postgresql_with={'m': 16, 'ef_construction': 64},
-              postgresql_ops={'embedding': 'vector_cosine_ops'}),
-        # GIN Index for fast Metadata filtering
         Index('ix_document_sections_metadata', metadata_, postgresql_using='gin'),
     )
 

@@ -81,7 +81,18 @@ def _build_article(concept: Concept) -> dict:
                 "youtube_url": doc.youtube_url if doc else None,
             })
 
-    # 3. Related concepts (direct peers, deduplicated)
+    # 3. Synthesize description from sources if empty or generic
+    description = concept.description or ""
+    if not description or "Extracted from document summary" in description:
+        if sources:
+            best = max(sources, key=lambda s: len(s.get("content", "")))
+            snippet = best.get("content", "")[:500].strip()
+            if snippet:
+                description = snippet
+        if not description:
+            description = f"See {concept.name} in the sources below."
+
+    # 4. Related concepts (direct peers, deduplicated)
     related = []
     if related_concept_ids:
         related_concepts = db.session.query(Concept).filter(Concept.id.in_(list(related_concept_ids))).all()
@@ -90,7 +101,7 @@ def _build_article(concept: Concept) -> dict:
     return {
         "id": str(concept.id),
         "name": concept.name,
-        "description": concept.description or "",
+        "description": description,
         "relations": relations,
         "sources": sources,
         "related": related,

@@ -1,8 +1,5 @@
-from sqlalchemy import Column, String, Text, DateTime, Enum, Integer
-from sqlalchemy.dialects.postgresql import UUID, JSONB, TSVECTOR
-from sqlalchemy import Computed, Index
-from pgvector.sqlalchemy import Vector
-from config.settings import settings
+from sqlalchemy import Column, String, Text, DateTime, Enum, Integer, Index
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from uuid import uuid4
@@ -32,22 +29,11 @@ class Document(db.Model):
     stars = Column(Integer, default=0)
     comment = Column(Text)
     
-    # RAG Optimization: Summary Indexing & Multi-Language
+    # RAG Optimization: Multi-Language
     language = Column(String(50), default='english') # 'english', 'spanish', 'german', etc.
     summary = Column(Text)
-    summary_embedding = Column(Vector(settings.EMBEDDING_DIMENSION))
-    
-    # Managed by DB Trigger: update_summary_search_vector
-    summary_search_vector = Column(TSVECTOR)
 
     collection = relationship('Collection', backref='documents')
-
-    __table_args__ = (
-        Index('ix_documents_summary_embedding', summary_embedding, postgresql_using='hnsw',
-              postgresql_with={'m': 16, 'ef_construction': 64},
-              postgresql_ops={'summary_embedding': 'vector_cosine_ops'}),
-        Index('ix_documents_summary_search_vector', summary_search_vector, postgresql_using='gin'),
-    )
 
 
     def to_dict(self):

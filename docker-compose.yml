@@ -34,9 +34,9 @@ services:
       - ./.env:/app/.env:ro
       - ./migrations:/app/migrations:rw
       - ./models:/app/models:ro
-      - uploads_data:/app/uploads
-      - whisper_cache:/root/.cache/whisper
-      - hf_cache:/root/.cache/huggingface
+      - ./data/uploads:/app/uploads
+      - ./data/whisper_cache:/root/.cache/whisper
+      - ./data/hf_cache:/root/.cache/huggingface
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       db:
@@ -72,9 +72,9 @@ services:
       - ./app:/app/app:rw
       - ./config:/app/config:rw
       - ./.env:/app/.env:ro
-      - uploads_data:/app/uploads
-      - whisper_cache:/root/.cache/whisper
-      - hf_cache:/root/.cache/huggingface
+      - ./data/uploads:/app/uploads
+      - ./data/whisper_cache:/root/.cache/whisper
+      - ./data/hf_cache:/root/.cache/huggingface
       - ./models:/app/models:rw
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
@@ -191,7 +191,4 @@ services:
 
 volumes:
   postgres_data:
-  uploads_data:
-  whisper_cache:
   redis_data:
-  hf_cache:

@@ -158,6 +158,12 @@ class LLMClient:
             )
             self.model = model or s_local_model
 
+        # Providers that support strict json_schema structured output
+        self.supports_json_schema = self.provider in (
+            LLMProvider.OPENAI,
+            LLMProvider.GROQ,
+        )
+
         logger.debug(f"LLMClient Initialized. Provider: {self.provider}. Base URL: {self.client.base_url}")
 
     def chat(self, system: str, messages: list, images: list = None, model: str = None, json_schema: dict = None) -> str:
@@ -266,10 +272,15 @@ class LLMClient:
                 }
 
                 if json_schema:
-                    request_params["response_format"] = {
-                        "type": "json_schema",
-                        "json_schema": json_schema
-                    }
+                    if self.supports_json_schema:
+                        request_params["response_format"] = {
+                            "type": "json_schema",
+                            "json_schema": json_schema
+                        }
+                    else:
+                        # Provider only supports basic JSON mode — the prompt already
+                        # describes the required structure, so this is sufficient.
+                        request_params["response_format"] = {"type": "json_object"}
 
                 response = self.client.chat.completions.create(**request_params)
 

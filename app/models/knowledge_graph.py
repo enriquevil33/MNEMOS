@@ -25,8 +25,7 @@ class HyperEdge(db.Model):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     description = Column(Text, nullable=False) # e.g. "A activates B in context C"
-    embedding = Column(Vector(settings.EMBEDDING_DIMENSION))
-    
+
     source_document_id = Column(UUID(as_uuid=True), ForeignKey('documents.id', ondelete='CASCADE'), nullable=True)
     source_section_id = Column(UUID(as_uuid=True), ForeignKey('document_sections.id', ondelete='CASCADE'), nullable=True)
     source_chunk_id = Column(UUID(as_uuid=True), ForeignKey('chunks.id', ondelete='CASCADE'), nullable=True)
