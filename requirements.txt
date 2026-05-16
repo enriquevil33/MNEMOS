@@ -1,3 +1,4 @@
+langdetect
 flask>=3.0
 flask-limiter[redis]
 gunicorn
