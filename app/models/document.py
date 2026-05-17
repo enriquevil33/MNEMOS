@@ -33,6 +33,10 @@ class Document(db.Model):
     language = Column(String(50), default='english') # 'english', 'spanish', 'german', etc.
     summary = Column(Text)
 
+    # Resume + toggle
+    run_hypergraph = Column(db.Boolean, default=False)
+    processing_stage = Column(String(50), nullable=True)  # null, 'extracted', 'embedded', 'summarized', 'hypergraph_done'
+
     collection = relationship('Collection', backref='documents')
 
 
@@ -51,5 +55,7 @@ class Document(db.Model):
             "tag": self.tag,
             "stars": self.stars,
             "comment": self.comment,
-            "summary": self.summary
+            "summary": self.summary,
+            "run_hypergraph": self.run_hypergraph,
+            "processing_stage": self.processing_stage
         }

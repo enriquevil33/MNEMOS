@@ -42,6 +42,35 @@ def process_document_task(self, document_id: str):
             doc.processing_progress = 10  # Started
             db.session.commit()
 
+            # Resume gate: if chunks already exist for this document, skip
+            # extraction + embedding entirely and jump straight to summary/hypergraph.
+            # The DB is our checkpoint — interrupted uploads don't re-burn local GPU time.
+            existing_chunk_count = db.session.query(Chunk).filter_by(document_id=doc.id).count()
+            if existing_chunk_count > 0:
+                logger.info(f"Resume: {existing_chunk_count} chunks already exist for doc {document_id}. "
+                            f"Skipping extraction + embedding.")
+                doc.processing_progress = 70
+                db.session.commit()
+
+                if not doc.summary:
+                    _generate_summary_logic(doc.id)
+                else:
+                    logger.info("Resume: summary already exists, skipping.")
+
+                try:
+                    from app.services.hypergraph_extractor import HypergraphExtractor
+                    doc.processing_progress = 90
+                    db.session.commit()
+                    HypergraphExtractor.process_document(doc.id)
+                except Exception as hg_e:
+                    logger.error(f"Hypergraph extraction failed (non-blocking): {hg_e}")
+
+                doc.status = 'completed'
+                doc.processing_progress = 100
+                db.session.commit()
+                logger.info(f"Resume complete for document {document_id}")
+                return "Resumed and completed"
+
             text_chunks = [] # List of {"text": str, "start": float, "end": float, "page": int}
 
             # 1. Extract Content
@@ -273,7 +302,10 @@ def process_document_task(self, document_id: str):
                 logger.info(f"Saved {total} chunks to database")
                 
                 # --- Generate Document Summary (Summary Indexing) ---
-                _generate_summary_logic(doc.id)
+                if not doc.summary:
+                    _generate_summary_logic(doc.id)
+                else:
+                    logger.info("Summary already exists, skipping.")
 
                 # --- Hypergraph Extraction (New Step) ---
                 try:

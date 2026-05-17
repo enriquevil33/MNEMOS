@@ -81,9 +81,9 @@ def _build_article(concept: Concept) -> dict:
                 "youtube_url": doc.youtube_url if doc else None,
             })
 
-    # 3. Synthesize description from sources if empty or generic
+    # 3. Synthesize description from sources if empty
     description = concept.description or ""
-    if not description or "Extracted from document summary" in description:
+    if not description:
         if sources:
             best = max(sources, key=lambda s: len(s.get("content", "")))
             snippet = best.get("content", "")[:500].strip()

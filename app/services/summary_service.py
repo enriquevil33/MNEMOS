@@ -1,7 +1,9 @@
 from app.extensions import db
 from app.models.document import Document
 from app.models.chunk import Chunk
+from app.models.knowledge_graph import Concept
 from app.services.llm_client import get_llm_client, reset_client
+from app.services.embedder import EmbedderService
 import logging
 from uuid import UUID
 import json
@@ -125,7 +127,23 @@ class SummaryService:
             doc.summary = global_summary
             if doc.metadata_ is None: doc.metadata_ = {}
             doc.metadata_['key_concepts'] = global_concepts
-            
+
+            # 5b. Upsert summary concepts into Concept table so wiki works
+            # without requiring the expensive hypergraph pass. Hypergraph
+            # (if run later) will enrich these with definitions + relations.
+            if global_concepts:
+                embedder = EmbedderService()
+                for name in global_concepts:
+                    norm = name.lower().strip()
+                    if not norm:
+                        continue
+                    existing = db.session.query(Concept).filter_by(name=norm).first()
+                    if existing:
+                        continue
+                    concept = Concept(name=norm)
+                    concept.embedding = embedder.embed([norm])[0]
+                    db.session.add(concept)
+
             # 6. Save Sections to 'document_sections' Table
             from app.models.section import DocumentSection
             
