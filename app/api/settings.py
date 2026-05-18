@@ -928,7 +928,8 @@ def get_chat_settings():
             "selected_system_prompt_id": None,
             "chunk_size": 1024,
             "chunk_overlap": 100,
-            "whisper_model": "base"
+            "whisper_model": "base",
+            "archive_enabled": False,
         })
 
     return jsonify({
@@ -968,6 +969,7 @@ def get_chat_settings():
         "llm_frequency_penalty": getattr(prefs, 'llm_frequency_penalty', 0.3),
         "llm_presence_penalty": getattr(prefs, 'llm_presence_penalty', 0.1),
         "retrieval_top_k": getattr(prefs, 'retrieval_top_k', 10),
+        "archive_enabled": getattr(prefs, 'archive_enabled', False),
     })
 
 
@@ -1109,6 +1111,9 @@ def save_chat_settings():
 
     if 'retrieval_top_k' in data:
         prefs.retrieval_top_k = max(1, min(50, int(data['retrieval_top_k'])))
+
+    if 'archive_enabled' in data:
+        prefs.archive_enabled = bool(data['archive_enabled'])
 
     prefs.updated_at = datetime.utcnow()
     db.session.commit()

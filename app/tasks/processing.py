@@ -317,6 +317,12 @@ def process_document_task(self, document_id: str):
                     logger.error(f"Hypergraph extraction failed (non-blocking): {hg_e}")
 
                 
+            # Re-fetch in case the doc was deleted mid-process by the user
+            doc = db.session.get(Document, UUID(document_id))
+            if not doc:
+                logger.warning(f"Document {document_id} was deleted during processing; nothing to finalize.")
+                return "Deleted during processing"
+
             doc.status = 'completed'
             doc.processing_progress = 100
             db.session.commit()
@@ -325,10 +331,15 @@ def process_document_task(self, document_id: str):
         except Exception as e:
             logger.exception(f"Error processing document {document_id}")
             db.session.rollback()
-            if 'doc' in locals() and doc:
-                 doc.status = 'error'
-                 doc.error_message = str(e)
-                 db.session.commit()
+            # Re-fetch fresh — original `doc` may be stale or deleted
+            try:
+                fresh_doc = db.session.get(Document, UUID(document_id))
+                if fresh_doc:
+                    fresh_doc.status = 'error'
+                    fresh_doc.error_message = str(e)
+                    db.session.commit()
+            except Exception as inner:
+                logger.error(f"Failed to mark doc as error (likely deleted): {inner}")
             raise e
 
 def _generate_summary_logic(document_id):

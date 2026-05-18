@@ -35,6 +35,7 @@ services:
       - ./migrations:/app/migrations:rw
       - ./models:/app/models:ro
       - ./data/uploads:/app/uploads
+      - ./data/archive:/app/archive
       - ./data/whisper_cache:/root/.cache/whisper
       - ./data/hf_cache:/root/.cache/huggingface
       - /var/run/docker.sock:/var/run/docker.sock
@@ -73,6 +74,7 @@ services:
       - ./config:/app/config:rw
       - ./.env:/app/.env:ro
       - ./data/uploads:/app/uploads
+      - ./data/archive:/app/archive
       - ./data/whisper_cache:/root/.cache/whisper
       - ./data/hf_cache:/root/.cache/huggingface
       - ./models:/app/models:rw

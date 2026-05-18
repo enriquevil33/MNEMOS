@@ -88,12 +88,13 @@ def _parse_response(response: str):
     return json.loads(clean)
 
 
-def _extract_batch(batch_idx: int, total: int, context_text: str, first_chunk_id):
+def _extract_batch(batch_idx: int, total: int, context_text: str, first_chunk_id, llm):
     """
     Pass 1 worker: pure LLM call + parse. NO DB writes.
+    LLM client is passed in from the main thread to avoid thread-local client
+    contamination (workers may inherit stale clients from prior tasks).
     Returns (batch_idx, first_chunk_id, events, definitions) or None on failure.
     """
-    llm = get_llm_client()
     logger.info(f"Hypergraph batch {batch_idx + 1}/{total} extracting...")
     try:
         response = llm.chat(
@@ -185,10 +186,13 @@ class HypergraphExtractor:
                         f"({len(batches) - len(todo)} resumed from previous run).")
 
             # ---- PASS 1: parallel LLM extraction, no DB writes ----
+            # Instantiate one fresh client in the main thread — all workers share
+            # it so they can't inherit a stale thread-local client from prior tasks.
+            llm = get_llm_client()
             results = []
             with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
                 futures = {
-                    ex.submit(_extract_batch, idx, len(batches), text, fcid): idx
+                    ex.submit(_extract_batch, idx, len(batches), text, fcid, llm): idx
                     for (idx, text, fcid) in todo
                 }
                 for fut in as_completed(futures):
@@ -310,7 +314,12 @@ class HypergraphExtractor:
                         ))
                     total_events += 1
 
-                # Commit per batch so partial progress persists for resume
+                # Commit per batch so partial progress persists for resume.
+                # If the document was deleted mid-process, abort gracefully.
+                if not db.session.get(Document, doc.id):
+                    logger.warning(f"Document {doc.id} deleted mid-process; aborting hypergraph.")
+                    db.session.rollback()
+                    return
                 db.session.commit()
 
             logger.info(f"Hypergraph extraction complete. Extracted {total_events} events "

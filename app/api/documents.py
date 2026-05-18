@@ -117,6 +117,7 @@ def delete_document(doc_id):
         return "", 404
 
     file_path = doc.file_path
+    file_type = doc.file_type
 
     # Delete file from disk if it exists
     if file_path and not file_path.startswith('youtube_'):
@@ -127,6 +128,17 @@ def delete_document(doc_id):
                  logger.info(f"Deleted file {full_path}")
              except Exception as e:
                  logger.error(f"Error deleting file {full_path}: {e}")
+
+    # Also remove archive copy if present (best-effort — archive may not exist)
+    if file_path and file_type:
+        from app.utils.archive import get_archive_folder_for_type
+        try:
+            archive_path = os.path.join(get_archive_folder_for_type(file_type), file_path)
+            if os.path.exists(archive_path):
+                os.remove(archive_path)
+                logger.info(f"Deleted archive copy {archive_path}")
+        except Exception as e:
+            logger.error(f"Error deleting archive copy for {file_path}: {e}")
 
     # Use raw SQL to avoid SQLAlchemy relationship tracking issues
     db.session.execute(text("DELETE FROM documents WHERE id = :id"), {"id": doc_id})
