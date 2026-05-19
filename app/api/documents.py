@@ -324,6 +324,38 @@ def generate_summary(doc_id):
     
     return jsonify({'status': 'queued'}), 202
 
+@bp.route('/backfill-concepts', methods=['POST'])
+def backfill_concepts():
+    """
+    One-shot: reads key_concepts from each document's metadata_ and upserts
+    them into the Concept table. Safe to run multiple times (skips existing).
+    Use this after upgrading to the version that writes concepts during summary.
+    """
+    from app.models.knowledge_graph import Concept
+    from app.services.embedder import EmbedderService
+
+    docs = db.session.query(Document).filter(Document.metadata_.isnot(None)).all()
+    added = 0
+    embedder = EmbedderService()
+
+    for doc in docs:
+        concepts_list = (doc.metadata_ or {}).get('key_concepts', [])
+        for name in concepts_list:
+            norm = name.lower().strip()
+            if not norm:
+                continue
+            if db.session.query(Concept).filter_by(name=norm).first():
+                continue
+            concept = Concept(name=norm)
+            concept.embedding = embedder.embed([norm])[0]
+            db.session.add(concept)
+            added += 1
+
+    db.session.commit()
+    logger.info(f"Backfill concepts: added {added} concepts from document metadata.")
+    return jsonify({'status': 'done', 'added': added}), 200
+
+
 @bp.route('/reprocess-hypergraph', methods=['POST'])
 def reprocess_hypergraph():
     """

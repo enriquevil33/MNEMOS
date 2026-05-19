@@ -215,8 +215,8 @@ class HypergraphExtractor:
                     if norm not in name_to_def or not name_to_def[norm]:
                         name_to_def[norm] = _coerce_definition(v)
                 for ev in events:
-                    srcs = ev.get("source", [])
-                    tgts = ev.get("target", [])
+                    srcs = ev.get("source") or []
+                    tgts = ev.get("target") or []
                     if isinstance(srcs, str): srcs = [srcs]
                     if isinstance(tgts, str): tgts = [tgts]
                     for n in srcs + tgts:
@@ -275,8 +275,8 @@ class HypergraphExtractor:
             total_events = 0
             for batch_idx, first_chunk_id, events, _ in results:
                 for ev in events:
-                    srcs = ev.get("source", [])
-                    tgts = ev.get("target", [])
+                    srcs = ev.get("source") or []
+                    tgts = ev.get("target") or []
                     relation = ev.get("relation", "relates to")
                     if isinstance(srcs, str): srcs = [srcs]
                     if isinstance(tgts, str): tgts = [tgts]

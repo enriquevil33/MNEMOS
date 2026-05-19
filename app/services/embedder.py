@@ -38,25 +38,31 @@ class EmbedderService:
 
                 logger.info(f"Loading embedding model: {settings.EMBEDDING_MODEL} on {device}")
 
+                def _load_model(dev):
+                    """Try online load first; fall back to local cache if network unavailable."""
+                    try:
+                        return SentenceTransformer(settings.EMBEDDING_MODEL, device=dev)
+                    except Exception as e:
+                        if any(kw in str(type(e).__module__) for kw in ("requests", "urllib", "httpx", "huggingface_hub")):
+                            logger.warning(f"No internet access, loading {settings.EMBEDDING_MODEL} from local cache.")
+                            return SentenceTransformer(settings.EMBEDDING_MODEL, device=dev, local_files_only=True)
+                        raise
+
                 try:
-                    # Load model with validated device
-                    cls._model = SentenceTransformer(settings.EMBEDDING_MODEL, device=device)
+                    cls._model = _load_model(device)
                 except Exception as e:
-                    # Handle cases where model loading fails despite device validation
-                    # (e.g., incompatible CUDA driver version)
                     if device != "cpu":
                         logger.error(
                             f"Failed to load embedding model on {device}: {e}. "
                             f"Attempting fallback to CPU."
                         )
                         try:
-                            cls._model = SentenceTransformer(settings.EMBEDDING_MODEL, device="cpu")
+                            cls._model = _load_model("cpu")
                             logger.info("Successfully loaded embedding model on CPU fallback")
                         except Exception as cpu_error:
                             logger.error(f"Failed to load embedding model even on CPU: {cpu_error}")
                             raise
                     else:
-                        # Already on CPU, can't fallback further
                         logger.error(f"Failed to load embedding model on CPU: {e}")
                         raise
 
