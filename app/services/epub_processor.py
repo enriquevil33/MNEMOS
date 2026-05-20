@@ -29,22 +29,36 @@ class EpubProcessor:
             # In EPUB, "pages" are vague. We'll use document items (chapters) as units.
             # We filter for only the document/html items.
             items = list(book.get_items_of_type(ebooklib.ITEM_DOCUMENT))
-            
-            for i, item in enumerate(items):
-                content = item.get_content()
-                soup = BeautifulSoup(content, 'html.parser')
-                
-                # Strip script and style elements
-                for script in soup(["script", "style"]):
-                    script.extract()
-                    
-                text = soup.get_text(separator=' ', strip=True)
-                
-                if text:
-                    pages.append({
-                        "text": text,
-                        "page": i + 1  # Using document order as page number
-                    })
+
+            # Fallback: some EPUBs store pages in subdirectories that ebooklib misses,
+            # or only registers one item (e.g. notice.html) instead of all page files.
+            # Read HTML files directly from the zip when ebooklib finds fewer than 3 items.
+            if len(items) < 3:
+                logger.warning("No ITEM_DOCUMENT items found, falling back to direct zip read.")
+                import zipfile
+                with zipfile.ZipFile(file_path) as zf:
+                    html_names = sorted(
+                        n for n in zf.namelist()
+                        if n.endswith(('.html', '.htm', '.xhtml'))
+                        and not n.lower().startswith('meta')
+                    )
+                    for i, name in enumerate(html_names):
+                        content = zf.read(name)
+                        soup = BeautifulSoup(content, 'html.parser')
+                        for tag in soup(["script", "style"]):
+                            tag.extract()
+                        text = soup.get_text(separator=' ', strip=True)
+                        if text:
+                            pages.append({"text": text, "page": i + 1})
+            else:
+                for i, item in enumerate(items):
+                    content = item.get_content()
+                    soup = BeautifulSoup(content, 'html.parser')
+                    for tag in soup(["script", "style"]):
+                        tag.extract()
+                    text = soup.get_text(separator=' ', strip=True)
+                    if text:
+                        pages.append({"text": text, "page": i + 1})
             
             return pages, metadata
             
