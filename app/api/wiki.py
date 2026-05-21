@@ -129,8 +129,8 @@ def list_concepts():
 
     if letter:
         if letter == '#':
-            # Filter for concepts that don't start with a-z
-            query = query.filter(~func.lower(Concept.name).op('REGEXP')('^[a-z]'))
+            # Filter for concepts that don't start with a-z (PostgreSQL regex: ~)
+            query = query.filter(~func.lower(Concept.name).op('~')('^[a-z]'))
         elif len(letter) == 1 and letter.isalpha():
             # Filter for concepts starting with the specified letter
             query = query.filter(func.lower(Concept.name).startswith(letter))

@@ -1,680 +1,287 @@
-# MNEMOS: Context Daemon
- 
-MNEMOS es un sistema de **GraphRAG** e indexación semántica con memoria persistente y capacidades agénticas multimodales.
-
-Va más allá de la búsqueda de texto tradicional al integrar un **Motor de Razonamiento** y **Extracción de Hipergrafos** para comprender y conectar relaciones complejas entre conceptos. Permite procesar documentos PDF, archivos de audio, videos y contenido de YouTube, proporcionando una interfaz conversacional inteligente para consultar y **analizar profundamente** la información utilizando modelos de lenguaje grandes (LLMs).
 
 
-## Características Principales
+<div align="center" style="position: relative; max-width: 700px; margin: 0 auto; border-radius: 16px; overflow: hidden;">
+  <img src="frontend_spa/public/mnemosyne-awa-optimized.gif" alt="MNEMOS background" style="width: 100%; display: block;">
+  <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.3);">
+    <img src="frontend_spa/public/favicon.svg" alt="MNEMOS icon" style="width: 64px; height: 64px; margin-bottom: 8px;">
+    <h1 style="font-family: 'Georgia', 'Times New Roman', serif; font-size: clamp(2rem, 6vw, 4rem); font-weight: 700; color: white; text-shadow: 0 2px 12px rgba(0,0,0,0.6); margin: 0; letter-spacing: 0.05em;">MNEMOS</h1>
+    <p style="font-family: sans-serif; font-size: clamp(0.9rem, 2vw, 1.2rem); color: rgba(255,255,255,0.85); margin: 4px 0 0 0; text-shadow: 0 1px 6px rgba(0,0,0,0.5);">Context Daemon</p>
+  </div>
+</div>
 
-### Experiencia de Usuario Mejorada
-- **Citas Persistentes**: Referencias interactivas a fuentes que se mantienen al recargar
-- **Gestión de Modelos**: Descarga automática de modelos GGUF y gestión de modelos locales
-- **Lanzador Automático**: Script `launcher.py` para configuración "one-click" en Windows
+---
 
-### Procesamiento Multimodal
-- **Imágenes (Visión)**: Análisis inteligente de imágenes con modelos Llama 3.2 Vision y similares
-- **PDFs**: Extracción de texto y segmentación por páginas
-- **Audio/Video**: Transcripción automática usando Whisper de OpenAI
-- **YouTube**: Descarga y transcripción automática de videos
-- **Procesamiento Asíncrono**: Sistema de colas con Celery para procesamiento en segundo plano
+## ¿Qué es MNEMOS?
 
-### Búsqueda Avanzada
-- **Búsqueda Híbrida**: Combina búsqueda vectorial (70%) y búsqueda de texto completo (30%)
-- **Embeddings Vectoriales**: Utiliza pgvector con índices HNSW para búsquedas rápidas
-- **Búsqueda de Texto Completo**: Implementación con PostgreSQL FTS y configuración en español
-- **Chunking Inteligente**: Segmentación semántica de documentos usando LangChain
-- **Extracción Profunda (Hypergraph)**: Análisis granular de eventos, definiciones y relaciones semánticas dentro de los documentos.
-- **Motor de Razonamiento**: Capacidad de navegar el grafo de conocimiento para descubrir conexiones no obvias entre conceptos de diferentes documentos.
+MNEMOS es un sistema **GraphRAG** + **Wiki** que convierte documentos (PDF, audio, video, YouTube, imágenes) en un **hipergrafo de conocimiento** interconectado.
 
-### Modelos de IA Flexibles
-- **Conexiones Personalizadas**: Soporte para cualquier proveedor compatible con OpenAI (ej. vLLM, DeepSeek) mediante URL base personalizada.
-- soporte para múltiples proveedores de LLM:
-- **Groq** (Inferencia ultra-rápida LPU)
-- **OpenAI** (GPT-4, GPT-3.5, etc.)
-- **Anthropic** (Claude Sonnet, Claude Opus)
-- **LM Studio** (modelos locales)
-- **Ollama** (modelos locales dockerizados)
+Piensa en él como una **wiki inteligente y automática**: subes documentos, MNEMOS extrae conceptos, los relaciona y construye un grafo navegable. Puedes chatear con tus documentos, explorar el grafo y descubrir conexiones que no sabías que existían.
 
-### Interfaz y APIs
-- **Interfaz Web Moderna**: Single Page Application (SPA) construida con **Angular 19**.
-- **Diseño Responsivo**: Experiencia de usuario fluida en escritorio y móviles.
-- **Micro-interacciones**: Feedback visual inmediato y animaciones suaves.
-- **Gestión de Documentos Mejorada**: Barras de progreso en tiempo real para subidas y procesamiento.
-- **Visor de Imágenes**: Navegación tipo carrusel para imágenes adjuntas.
-- **API REST**: Endpoints completos para integración
-- **MCP Server**: Servidor Model Context Protocol para integración con Claude Desktop
-- **Sistema de Conversaciones**: Gestión de historial de chat con contexto
+Funciona **en tu propio equipo** con modelos locales (llama.cpp) o usando APIs externas (OpenAI, Anthropic, Groq) si prefieres más potencia sin consumir recursos locales.
 
-## Arquitectura del Sistema
+---
 
-```
-┌───────────────────────────────────────────────────────────┐
-│                   Frontend (Angular SPA)                  │
-│  - Settings, Chat, Library, Collections, GraphViz         │
-└─────────────────────────────┬─────────────────────────────┘
-                              │ REST API
-┌─────────────────────────────▼─────────────────────────────┐
-│                 Flask Application (API)                   │
-│   [Blueprints: documents, chat, settings, collections]    │
-└────────┬────────────────────┬────────────────────┬────────┘
-         │                    │                    │
-┌────────▼────────┐  ┌────────▼─────────┐  ┌───────▼────────┐
-│  Celery Worker  │  │   Logic / RAG    │  │ Ext. Providers │
-│                 │  │                  │  │                │
-│ - PDF Process   │  │ - Reasoning Eng  │  │ - OpenAI / Groq│
-│ - Summarization │  │ - Hypergraph Ext │  │ - Anthropic    │
-│ - Transcribe    │  │ - Summary Svc    │  │ - Ollama / LM  │
-│ - Embedder      │  │ - Search Logic   │  │ - Tavily/Duck  │
-└────────┬────────┘  └────────┬─────────┘  └───────┬────────┘
-         │                    │                    │
-         │           ┌────────▼─────────┐          │
-         └───────────►  PostgreSQL 16   ◄──────────┘
-                     │  - pgvector      │
-                     │  - Hypergraph    │
-                     │  - Memories      │
-                     │  - Collections   │
-                     └──────────────────┘
-```
+## Características principales
 
-## Modelos de Datos
+| Qué hace | Cómo lo hace |
+|---|---|
+| **GraphRAG + Wiki** | Extrae conceptos y relaciones → wiki navegable con artículos, búsqueda semántica y grafo de conocimiento |
+| **Documentos multimedia** | PDF, audio, video, YouTube, imágenes — todo se procesa y conecta en el mismo grafo |
+| **Chat inteligente** | Conversaciones con contexto de tus documentos, respuestas con citas a fuentes |
+| **Búsqueda híbrida** | Combina búsqueda vectorial (sentido semántico) + texto completo (palabras exactas) |
+| **Procesamiento en segundo plano** | Sube documentos y sigue trabajando — el sistema los procesa asíncronamente |
+| **Memoria persistente** | El sistema recuerda hechos sobre ti entre conversaciones |
+| **Local o cloud** | Usa modelos locales (llama.cpp, LM Studio, Ollama) o APIs externas (OpenAI, Anthropic, Groq) |
+| **Interfaz moderna** | Angular SPA con diseño responsivo, gráficos de conocimiento en vivo |
 
-### Document (Documento)
-- **id**: UUID único
-- **filename**: Nombre del archivo almacenado
-- **original_filename**: Nombre original del archivo
-- **file_type**: Tipo (pdf, audio, video, youtube)
-- **file_path**: Ruta en el sistema de archivos
-- **youtube_url**: URL de YouTube (si aplica)
-- **status**: Estado (pending, processing, completed, error)
-- **metadata_**: Metadatos JSON (duración, páginas, etc.)
+---
 
-### Chunk (Fragmento)
-- **id**: UUID único
-- **document_id**: Referencia al documento
-- **content**: Texto del fragmento
-- **chunk_index**: Orden del fragmento
-- **start_time/end_time**: Marcas de tiempo para audio/video
-- **page_number**: Número de página para PDFs
-- **embedding**: Vector de embeddings (384 dimensiones por defecto)
-- **search_vector**: Vector de búsqueda de texto completo (PostgreSQL TSVECTOR)
-- **DocumentSection**: Secciones/capítulos vectorizados del documento (para resúmenes estructurados).
+## Tecnología usada (y por qué)
 
-### Conversation & Message (Conversación y Mensajes)
-- Sistema de conversaciones con mensajes de usuario y asistente
-- Almacenamiento de fuentes utilizadas en cada respuesta
-- Gestión de historial completo
+### Backend
+| Tecnología | Beneficio |
+|---|---|
+| **Flask** (Python) | Ligero, flexible, fácil de extender |
+| **Celery + Redis** | Tareas en segundo plano sin bloquear al usuario |
+| **SQLAlchemy** | ORM maduro, migraciones con Alembic |
+| **llama.cpp** | Ejecuta modelos locales GGUF con aceleración GPU (NVIDIA CUDA) |
+| **OpenAI / Anthropic / Groq** | Conecta APIs cloud cuando no quieres usar recursos locales |
 
-### Knowledge Graph (Grafo de Conocimiento)
-- **Concept**: Entidades y definiciones extraídas (ej. "Proteína X", "Algoritmo Y").
-- **HyperEdge**: Relaciones complejas que conectan múltiples conceptos en un contexto específico.
-- **LLMConnection**: Configuración persistente de proveedores de LLM personalizados.
+### Frontend
+| Tecnología | Beneficio |
+|---|---|
+| **Angular 21** | Framework moderno, componentes reutilizables, tipado fuerte |
+| **TailwindCSS** | Estilos consistentes y rápidos sin CSS custom |
+| **RxJS** | Datos reactivos en tiempo real |
+| **Cytoscape.js** | Visualización interactiva del grafo de conocimiento |
 
-### Gestión y Preferencias
-- **Collection**: Agrupación lógica de documentos (Carpetas/Temas).
-- **UserMemory**: Hechos permanentes extraídos sobre el usuario (Memoria a Largo Plazo).
-- **SystemPrompt**: Plantillas de instrucciones para el asistente (Prompt Engineering).
-- **UserPreferences**: Configuración centralizada (Modelo activo, Proveedores de Voz/Búsqueda, API Keys).
+### Base de datos
+| Tecnología | Beneficio |
+|---|---|
+| **PostgreSQL 16 + pgvector** | Búsqueda vectorial de alto rendimiento + búsqueda de texto completo |
+| **Índices HNSW** | Búsquedas vectoriales ultrarrápidas incluso con millones de fragmentos |
 
-## Servicios Principales
+### ¿Por qué esta combinación?
+- **Todo corre en Docker** → no instalan nada raro en tu sistema, solo Docker Desktop
+- **GPU autodetected** → si tienes NVIDIA CUDA, se usa; si no, corre en CPU
+- **Modelos locales con llama.cpp** → sin depender de internet, sin costos de API
+- **Pero también acepta APIs** → si quieres usar GPT-4 o Claude, solo configura las keys
 
-### RAGService ([app/services/rag.py](app/services/rag.py))
-Motor principal de RAG que implementa:
-- Búsqueda híbrida combinando similitud coseno y ranking de texto completo
-- Construcción de contexto con información de fuentes
-- Generación de respuestas usando LLMs
-- Formato de tiempo para referencias de audio/video
+---
 
-### LLMClient ([app/services/llm_client.py](app/services/llm_client.py))
-Cliente unificado para múltiples proveedores de LLM:
-- Abstracción de APIs de OpenAI, Anthropic, LM Studio y Ollama
-- Manejo consistente de mensajes y respuestas
-- Logging detallado para debugging
+## Instalación
 
-### EmbedderService ([app/services/embedder.py](app/services/embedder.py))
-Generación de embeddings vectoriales:
-- Soporte local con sentence-transformers
-- Soporte remoto con OpenAI/LM Studio/Ollama
-- Procesamiento por lotes con reintentos automáticos
-- Cache de modelos para eficiencia
+### Requisitos
+- **Windows 10/11**
+- **Docker Desktop** instalado y funcionando
+- **8 GB RAM** mínimo (16 GB recomendado)
+- **GPU NVIDIA** (opcional, para aceleración)
 
-### TranscriptionService ([app/services/transcription.py](app/services/transcription.py))
-Transcripción de audio/video usando Whisper:
-- Soporte para múltiples modelos (tiny, base, small, medium, large-v3)
-- Segmentación con marcas de tiempo
-- Soporte CPU y GPU
+### Pasos
 
-### ChunkerService ([app/services/chunker.py](app/services/chunker.py))
-Segmentación inteligente de texto:
-- Utiliza RecursiveCharacterTextSplitter de LangChain
-- Configuración de tamaño y solapamiento personalizables
-- Respeta límites semánticos (párrafos, líneas, palabras)
+1. **Clona el repositorio**
+   ```
+   git clone <url-del-repo>
+   cd mnemos/dev
+   ```
 
-### PDFProcessor ([app/services/pdf_processor.py](app/services/pdf_processor.py))
-Procesamiento de documentos PDF:
-- Extracción de texto usando PyMuPDF
-- Mantenimiento de información de páginas
-- Filtrado de páginas vacías
+2. **Configura las variables de entorno**
+   - Copia `.env.example` a `.env`
+   - Edita `.env` según tus preferencias (LLM provider, API keys, etc.)
 
-### YouTubeService ([app/services/youtube.py](app/services/youtube.py))
-Descarga y procesamiento de videos de YouTube:
-- Descarga de audio usando yt-dlp
-- Conversión a formato WAV
-- Extracción de metadatos (título, duración)
+3. **Ejecuta `start.bat`**
+   - Dale doble clic a `start.bat`
+   - El script construye las imágenes Docker (si hay cambios) y levanta todos los servicios
+   - Se abre automáticamente http://localhost:5200
 
-### HypergraphExtractor ([app/services/hypergraph_extractor.py](app/services/hypergraph_extractor.py))
-Servicio de extracción profunda de conocimientos:
-- Procesa documentos por lotes para extraer entidades y eventos.
-- Construye relaciones semánticas (Hiperaristas) entre conceptos.
-- Normaliza y desambigua términos técnicos.
+4. **¡Listo!** La interfaz web está funcionando.
 
-### ReasoningEngine ([app/services/reasoning_engine.py](app/services/reasoning_engine.py))
-Motor de inferencia sobre el grafo de conocimiento:
-- Realiza recorridos (traversal) entre conceptos distantes.
-- Sintetiza explicaciones narrativas de las conexiones encontradas.
-- Genera datos para visualización de grafos (Cytoscape).
+### Notas importantes
+- **Primera ejecución**: tarda unos minutos en descargar dependencias y construir imágenes.
+- **Modelos GGUF**: coloca tus modelos `.gguf` en la carpeta `models/`. Si hay al menos uno, `start.bat` activa el servidor llama.cpp automáticamente.
+- **Sin GPU**: si no tienes NVIDIA CUDA, usa `docker-compose -f docker-compose.yml -f docker-compose.cpu.yml up -d` (o edita `start.bat` para incluir CPU mode).
 
-### SummaryService ([app/services/summary_service.py](app/services/summary_service.py))
-Servicio de generación de resúmenes estructurados:
-- Utiliza patrón Map-Reduce para documentos largos.
-- Identifica estructura de capítulos automáticamente.
-- Extrae conceptos clave por sección y genera un resumen ejecutivo global.
-
-
-## Instalación y Configuración
-
-### Requisitos Previos
-- **Sistema Operativo**: Windows 10/11
-- **Hardware**:
-    - CPU: Compatible con versiones modernas de AVX
-    - GPU (Opcional): NVIDIA con soporte CUDA para aceleración
-    - RAM: 8GB mínimo (16GB recomendado)
-- **Software**:
-    - Ninguno pre-instalado (el instalador gestionará Podman/Docker)
-    - Opcional: Docker Desktop ya instalado
-
-### Instalación Rápida "One-Click"
-Hemos simplificado el proceso al máximo. Simplemente:
-
-1. Ejecuta el archivo `installer.bat` (doble clic).
-2. El script detectará si tienes Docker o Podman. **Si no tienes ninguno, instalará Podman automáticamente.**
-3. Detectará automáticamente tu tarjeta gráfica y te preguntará si quieres usarla.
-4. Listo. La aplicación se iniciará.
-
-El instalador se encarga de todo:
-- Descarga e instalación de Podman (si es necesario)
-- Configuración de WSL2 (si es necesario)
-- Detección de hardware (CPU vs GPU)
-- Despliegue de contenedores
-
-### Configuración Manual (Docker Compose)
-
-1. Clonar el repositorio:
-```bash
-git clone <repository-url>
-cd mnemos
-```
-
-2. Copiar y configurar variables de entorno:
-```bash
-cp .env.example .env
-```
-
-3. Editar el archivo `.env` con tus configuraciones:
-
-```env
-# Proveedor de LLM (openai, anthropic, lm_studio, ollama)
-LLM_PROVIDER=lm_studio
-
-# Groq (Inferencia Rápida)
-GROQ_API_KEY=tu-clave-api
-GROQ_MODEL=llama-3.3-70b-versatile
-
-# OpenAI (si se usa)
-OPENAI_API_KEY=tu-clave-api
-OPENAI_MODEL=gpt-4o-mini
-
-# Anthropic (si se usa)
-ANTHROPIC_API_KEY=tu-clave-api
-ANTHROPIC_MODEL=claude-sonnet-4-20250514
-
-# LM Studio / Local
-LOCAL_LLM_BASE_URL=http://host.docker.internal:1234/v1
-LOCAL_LLM_MODEL: local-model
-
-# Configuración de Embeddings
-EMBEDDING_PROVIDER=local
-EMBEDDING_MODEL=bge-m3
-EMBEDDING_DIMENSION=1024
-EMBEDDING_DEVICE=cuda
-EMBEDDING_BATCH_SIZE=0 # Auto
-
-# Configuración de Whisper
-WHISPER_MODEL=base
-WHISPER_DEVICE=cpu
-
-# Clave secreta (cambiar en producción)
-SECRET_KEY=tu-clave-secreta-segura
-```
-
-### Despliegue con Docker
- **Opción A: Estándar (Recomendado si tienes GPU NVIDIA)**
-```bash
-# Construir e iniciar todos los servicios
-docker-compose up -d --build
-```
-
-**Opción B: CPU / Sin GPU NVIDIA**
-Si tu equipo no tiene una tarjeta gráfica NVIDIA compatible con CUDA, usa esta configuración para evitar errores al iniciar:
-```bash
-# Usar el archivo de configuración adicional para CPU
-docker-compose -f docker-compose.yml -f docker-compose.cpu.yml up -d --build
-```
-
-### Comandos Comunes
+### Comandos útiles
 ```bash
 # Ver logs
 docker-compose logs -f app
 
-# Detener servicios
+# Detener todo
 docker-compose down
 
-# Detener y eliminar volúmenes (CUIDADO: elimina datos)
-docker-compose down -v
+# Reconstruir desde cero
+docker-compose up -d --build
 ```
-
-### Servicios Docker
-
-El sistema despliega los siguientes contenedores:
-
-- **app** (puerto 5000): Aplicación Flask principal
-- **worker**: Worker de Celery para procesamiento en segundo plano
-- **db** (puerto 5432): PostgreSQL 16 con extensión pgvector
-- **redis** (puerto 6379): Cola de mensajes para Celery
-- **ollama** (puerto 11435): Servidor Ollama para LLMs locales (opcional)
-- **mcp** (puerto 3000): Servidor MCP para integración con Claude Desktop
-
-## Uso de la Aplicación
-
-### Interfaz Web
-
-Acceder a [http://localhost:5200](http://localhost:5200) (o el puerto configurado).
-
-#### Subir Documentos
-1. Ir a la sección "Documents"
-2. Elegir archivo PDF, audio, video, o pegar URL de YouTube
-3. El documento se procesará automáticamente
-4. El estado se actualiza en tiempo real (pending → processing → completed)
-
-#### Realizar Consultas
-1. Ir a la sección "Chat"
-2. Escribir pregunta en el cuadro de texto
-3. Opcionalmente seleccionar documentos específicos
-4. El sistema buscará información relevante y generará una respuesta
-5. Las fuentes se muestran con referencias a documentos y ubicaciones
-
-#### Gestionar Conversaciones
-- Ver historial de conversaciones
-- Continuar conversaciones previas
-- Eliminar conversaciones
-
-### API REST
-
-#### Subir Documento
-```bash
-# Subir archivo
-curl -X POST http://localhost:5000/api/documents/upload \
-  -F "file=@documento.pdf"
-
-# Procesar YouTube
-curl -X POST http://localhost:5000/api/documents/upload \
-  -F "youtube_url=https://www.youtube.com/watch?v=VIDEO_ID"
-```
-
-#### Listar Documentos
-```bash
-curl http://localhost:5000/api/documents/
-```
-
-#### Realizar Consulta
-```bash
-curl -X POST http://localhost:5000/api/chat/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "¿Cuál es el tema principal del documento?",
-    "document_ids": ["uuid-del-documento"],
-    "top_k": 5
-  }'
-```
-
-#### Eliminar Documento
-```bash
-curl -X DELETE http://localhost:5000/api/documents/{document_id}
-```
-
-### Servidor MCP (Model Context Protocol)
-
-El servidor MCP permite integrar el sistema RAG con Claude Desktop.
-
-#### Configurar Claude Desktop
-
-Editar el archivo de configuración de Claude Desktop:
-
-**MacOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "mnemos-daemon": {
-      "command": "docker",
-      "args": [
-        "exec",
-        "-i",
-        "rag_app-mcp-1",
-        "python",
-        "-m",
-        "app.mcp_server.server"
-      ]
-    }
-  }
-}
-```
-
-#### Herramientas Disponibles
-
-1. **search_documents**: Buscar información en documentos
-   - `query`: Pregunta a realizar
-   - `document_ids`: IDs de documentos específicos (opcional)
-   - `top_k`: Número de chunks a usar (default: 5)
-
-2. **list_documents**: Listar todos los documentos disponibles con sus IDs
-
-## Configuración Avanzada
-
-### Ajustar Parámetros de Chunking
-
-Editar [config/settings.py](config/settings.py):
-
-```python
-CHUNK_SIZE: int = 512        # Tamaño de fragmento
-CHUNK_OVERLAP: int = 50      # Solapamiento entre fragmentos
-```
-
-### Cambiar Modelo de Whisper
-
-Opciones disponibles: `tiny`, `base`, `small`, `medium`, `large-v3`
-
-```env
-WHISPER_MODEL=medium
-WHISPER_DEVICE=cuda  # Usar GPU si está disponible
-```
-
-### Optimización de Embeddings
-
-El sistema ajusta automáticamente el tamaño del lote según la VRAM disponible. Configurable en [config/settings.py](config/settings.py):
-
-```python
-EMBEDDING_BATCH_SIZE: int = 0  # 0 = auto-detectar
-EMBEDDING_USE_FP16: bool = True # Usar precisión media (más rápido)
-```
-
-### Configurar Búsqueda Híbrida
-
-Ajustar pesos en [app/services/rag.py](app/services/rag.py:41):
-
-```python
-# Cambiar proporción vector/keyword
-hybrid_score = (similarity * 0.8) + (rank * 0.2)  # Más peso a vectores
-```
-
-### Usar Ollama con GPU
-
-El archivo `docker-compose.yml` ya incluye configuración GPU:
-
-```yaml
-deploy:
-  resources:
-    reservations:
-      devices:
-        - driver: nvidia
-          count: 1
-          capabilities: [ gpu ]
-```
-
-
-
-### Configuración de Búsqueda Web
-Habilitar capacidades de navegación para el agente:
-```env
-# Proveedor: duckduckgo, tavily, brave
-WEB_SEARCH_PROVIDER=tavily
-TAVILY_API_KEY=tvly-...
-```
-
-### Configuración de Voz (TTS/STT)
-Mnemos soporta múltiples motores de voz para entrada y salida de audio:
-- **TTS (Texto a Voz)**: Browser (gratis), OpenAI (HD), Deepgram.
-- **STT (Voz a Texto)**: Browser, OpenAI Whisper, Deepgram Nova.
-
-### Memoria a Largo Plazo
-Activar la retención de hechos entre conversaciones:
-```env
-MEMORY_ENABLED=true
-MEMORY_PROVIDER=ollama # o openai
-```
-
-## Estructura del Proyecto
-
-```
-rag_app/
-├── app/
-│   ├── __init__.py              # Factory de aplicación Flask
-│   ├── web.py                   # Rutas web
-│   ├── extensions.py            # Inicialización de extensiones
-│   ├── api/
-│   │   ├── documents.py         # API de documentos
-│   │   ├── chat.py              # API de chat
-│   │   ├── conversations.py     # API de conversaciones
-│   │   └── settings.py          # API de configuración
-│   ├── models/
-│   │   ├── document.py          # Modelo de documento
-│   │   ├── chunk.py             # Modelo de fragmento
-│   │   └── conversation.py      # Modelos de conversación
-│   ├── services/
-│   │   ├── rag.py               # Servicio RAG principal
-│   │   ├── llm_client.py        # Cliente LLM
-│   │   ├── embedder.py          # Generación de embeddings
-│   │   ├── chunker.py           # Segmentación de texto
-│   │   ├── pdf_processor.py     # Procesamiento PDF
-│   │   ├── transcription.py     # Transcripción de audio
-│   │   └── youtube.py           # Descarga de YouTube
-│   ├── tasks/
-│   │   └── processing.py        # Tareas Celery
-│   ├── mcp_server/
-│   │   └── server.py            # Servidor MCP
-│   └── static/                  # Archivos estáticos API
-├── frontend_spa/            # Código fuente Angular
-│   ├── src/
-│   │   ├── app/             # Componentes y Lógica
-│   │   └── assets/          # Imágenes y recursos
-│   ├── angular.json
-│   └── package.json
-├── config/
-├── config/
-│   └── settings.py              # Configuración centralizada
-├── media/                       # Archivos multimedia de ejemplo
-├── ollama_models/               # Modelos Ollama
-├── docker-compose.yml           # Orquestación Docker
-├── Dockerfile                   # Imagen Docker
-├── requirements.txt             # Dependencias Python
-└── .env.example                 # Plantilla de variables de entorno
-```
-
-## Tecnologías Utilizadas
-
-### Backend
-- **Flask**: Framework web
-- **SQLAlchemy**: ORM para base de datos
-- **Celery**: Procesamiento asíncrono de tareas
-- **Redis**: Cola de mensajes
-
-### Base de Datos
-- **PostgreSQL 16**: Base de datos principal
-- **pgvector**: Extensión para búsqueda vectorial
-- **HNSW Index**: Índice vectorial de alto rendimiento
-- **GIN Index**: Índice para búsqueda de texto completo
-
-### IA y ML
-- **OpenAI Whisper**: Transcripción de audio
-- **sentence-transformers**: Embeddings locales
-- **LangChain**: Segmentación de texto
-- **OpenAI / Anthropic**: LLMs en la nube
-- **Ollama / LM Studio**: LLMs locales
-
-### Procesamiento
-- **PyMuPDF**: Extracción de PDF
-- **yt-dlp**: Descarga de YouTube
-- **pydub**: Manipulación de audio
-- **tiktoken**: Tokenización
-
-### Frontend
-- **Angular 19**: Framework SPA moderno y robusto.
-- **TailwindCSS**: Diseño utilitario para estilos rápidos y consistentes.
-- **RxJS**: Gestión reactiva de datos y eventos.
-- **Markdown-to-HTML**: Renderizado seguro de respuestas del chat.
-
-## Troubleshooting
-
-### El worker no procesa documentos
-
-Verificar logs del worker:
-```bash
-docker-compose logs -f worker
-```
-
-Verificar conexión a Redis:
-```bash
-docker-compose exec worker redis-cli -h redis ping
-```
-
-### Errores de embeddings
-
-Si usas proveedor local y el modelo no descarga:
-```bash
-docker-compose exec worker python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
-```
-
-### Base de datos no inicializa
-
-Verificar extensión pgvector:
-```bash
-docker-compose exec db psql -U raguser -d ragdb -c "CREATE EXTENSION IF NOT EXISTS vector;"
-```
-
-### Problemas con Whisper
-
-Si hay errores de memoria con Whisper:
-1. Usar modelo más pequeño: `WHISPER_MODEL=tiny` o `base`
-2. Aumentar memoria del contenedor en docker-compose.yml
-
-### LM Studio no conecta
-
-Asegurar que LM Studio está:
-1. Ejecutándose en el host
-2. Escuchando en puerto 1234
-3. Con CORS habilitado
-4. URL correcta en .env: `http://host.docker.internal:1234/v1`
-
-## Mantenimiento
-
-### Backup de Base de Datos
-
-```bash
-docker-compose exec db pg_dump -U raguser ragdb > backup.sql
-```
-
-### Restaurar Base de Datos
-
-```bash
-cat backup.sql | docker-compose exec -T db psql -U raguser ragdb
-```
-
-### Limpiar Archivos Huérfanos
-
-Los archivos se eliminan automáticamente al borrar documentos, pero para limpiar manualmente:
-
-```bash
-docker-compose exec app python -c "
-from app import create_app
-from app.models.document import Document
-from app.extensions import db
-import os
-
-app = create_app()
-with app.app_context():
-    docs = Document.query.all()
-    doc_files = {d.file_path for d in docs if d.file_path}
-
-    upload_dir = '/app/uploads'
-    for f in os.listdir(upload_dir):
-        if f not in doc_files:
-            print(f'Deleting orphan: {f}')
-            os.remove(os.path.join(upload_dir, f))
-"
-```
-
-### Actualizar Dependencias
-
-```bash
-# Reconstruir imágenes
-docker-compose build --no-cache
-
-# Reiniciar servicios
-docker-compose up -d
-```
-
-## Seguridad
-
-### Recomendaciones para Producción
-
-1. **Cambiar SECRET_KEY**: Generar clave segura
-```bash
-python -c "import secrets; print(secrets.token_hex(32))"
-```
-
-2. **Configurar HTTPS**: Usar nginx o traefik como reverse proxy
-
-3. **Límites de tamaño**: Ajustar `MAX_CONTENT_LENGTH` según necesidades
-
-4. **Autenticación**: Implementar autenticación de usuarios (no incluida por defecto)
-
-5. **Variables de entorno**: No commitear `.env` al repositorio
-
-6. **Actualizaciones**: Mantener dependencias actualizadas
-
-## Licencia
-
-Este proyecto es de código abierto y está disponible bajo la licencia **GNU Affero General Public License v3.0 (AGPLv3)**. Consulte el archivo `LICENSE` para más detalles.
-
-## Contribuciones
-
-Las contribuciones son bienvenidas. Por favor:
-1. Fork del repositorio
-2. Crear rama de feature (`git checkout -b feature/AmazingFeature`)
-3. Commit de cambios (`git commit -m 'Add AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abrir Pull Request
-
-
-## Roadmap
-
-Funcionalidades planeadas:
-- [x] Soporte para EPUB (Incluyendo metadatos)
-- [x] Soporte para más formatos de documentos (Word, Excel, PowerPoint)
-- [x] Procesamiento de imágenes con modelos multimodales (Visión)
-- [ ] Exportación de conversaciones
-
 
 ---
 
+## Estructura del proyecto
+
+```
+dev/
+├── app/                  # Backend Flask (API, servicios, modelos)
+├── frontend_spa/         # Frontend Angular 21 (SPA moderna)
+├── config/               # Configuración centralizada
+├── models/               # Modelos GGUF para llama.cpp
+├── data/                 # Uploads, cachés, archivos
+├── docker-compose.yml    # Orquestación Docker
+├── start.bat             # ★ Punto de entrada recomendado
+└── .env                  # Variables de entorno
+```
+
+---
+
+## Uso básico
+
+1. **Sube documentos**: ve a "Documents" → arrastra PDF, audio, video o pega URL de YouTube
+2. **Explora el Wiki**: los conceptos extraídos aparecen en la sección Wiki, con artículos y relaciones
+3. **Chatea**: ve a "Chat" → haz preguntas sobre tus documentos
+4. **Visualiza el grafo**: explora conexiones entre conceptos en la vista de grafo interactivo
+
+---
+
+## Licencia
+
+**GNU Affero General Public License v3.0 (AGPLv3)** — ver archivo `LICENSE`.
+
+---
+
+<br>
+<br>
+
+# MNEMOS — Context Daemon
+
+---
+
+## What is MNEMOS?
+
+MNEMOS is a **GraphRAG** + **Wiki** system that turns documents (PDF, audio, video, YouTube, images) into an interconnected **knowledge hypergraph**.
+
+Think of it as a **smart, auto-building wiki**: upload documents, MNEMOS extracts concepts, links them together, and builds a navigable graph. You can chat with your documents, explore the graph, and discover connections you didn't know existed.
+
+It runs **on your own hardware** with local models (llama.cpp) or connects to external APIs (OpenAI, Anthropic, Groq) when you want more power without using local resources.
+
+---
+
+## Key Features
+
+| What | How |
+|---|---|
+| **GraphRAG + Wiki** | Extracts concepts & relationships → browsable wiki with articles, semantic search, and knowledge graph |
+| **Multimedia documents** | PDF, audio, video, YouTube, images — all processed and linked in the same graph |
+| **Smart Chat** | Conversational AI grounded in your documents, with source citations |
+| **Hybrid Search** | Vector search (meaning) + full-text search (keywords) combined |
+| **Background processing** | Upload documents and keep working — async queue handles the rest |
+| **Persistent memory** | Remembers facts about you across conversations |
+| **Local or Cloud LLMs** | Use local models (llama.cpp, LM Studio, Ollama) or cloud APIs (OpenAI, Anthropic, Groq) |
+| **Modern UI** | Angular SPA with responsive design, live knowledge graph visualization |
+
+---
+
+## Tech Stack & Why
+
+### Backend
+| Technology | Why |
+|---|---|
+| **Flask** (Python) | Lightweight, flexible, easy to extend |
+| **Celery + Redis** | Async background tasks — uploads never block the UI |
+| **SQLAlchemy** | Mature ORM with Alembic migrations |
+| **llama.cpp** | Runs local GGUF models with GPU acceleration (NVIDIA CUDA) |
+| **OpenAI / Anthropic / Groq** | Plug in cloud APIs when you don't want to use local resources |
+
+### Frontend
+| Technology | Why |
+|---|---|
+| **Angular 21** | Modern framework, reusable components, strong typing |
+| **TailwindCSS** | Fast, consistent styling without custom CSS |
+| **RxJS** | Reactive, real-time data flow |
+| **Cytoscape.js** | Interactive knowledge graph visualization |
+
+### Database
+| Technology | Why |
+|---|---|
+| **PostgreSQL 16 + pgvector** | High-performance vector search + full-text search in one DB |
+| **HNSW indexes** | Blazing fast vector similarity even with millions of chunks |
+
+### Why this stack?
+- **Everything runs in Docker** → no weird system installs, just Docker Desktop
+- **GPU auto-detected** → NVIDIA CUDA? It uses it. No GPU? Falls back to CPU
+- **Local models with llama.cpp** → no internet dependency, no API costs
+- **But cloud APIs work too** → want GPT-4 or Claude? Just configure the keys
+
+---
+
+## Installation
+
+### Requirements
+- **Windows 10/11**
+- **Docker Desktop** installed and running
+- **8 GB RAM** minimum (16 GB recommended)
+- **NVIDIA GPU** (optional, for acceleration)
+
+### Steps
+
+1. **Clone the repo**
+   ```
+   git clone <repo-url>
+   cd mnemos/dev
+   ```
+
+2. **Configure environment**
+   - Copy `.env.example` to `.env`
+   - Edit `.env` with your preferences (LLM provider, API keys, etc.)
+
+3. **Run `start.bat`**
+   - Double-click `start.bat`
+   - The script builds Docker images (if needed) and starts all services
+   - Opens http://localhost:5200 automatically
+
+4. **Done!** The web UI is ready.
+
+### Important notes
+- **First run**: takes a few minutes to download dependencies and build images.
+- **GGUF models**: put your `.gguf` models in `models/`. If at least one is present, `start.bat` automatically enables the llama.cpp server.
+- **No GPU**: if you don't have NVIDIA CUDA, use `docker-compose -f docker-compose.yml -f docker-compose.cpu.yml up -d` (or modify `start.bat` for CPU mode).
+
+### Useful commands
+```bash
+# View logs
+docker-compose logs -f app
+
+# Stop everything
+docker-compose down
+
+# Rebuild from scratch
+docker-compose up -d --build
+```
+
+---
+
+## Project structure
+
+```
+dev/
+├── app/                  # Flask backend (API, services, models)
+├── frontend_spa/         # Angular 21 frontend (modern SPA)
+├── config/               # Centralized settings
+├── models/               # GGUF models for llama.cpp
+├── data/                 # Uploads, caches, archives
+├── docker-compose.yml    # Docker orchestration
+├── start.bat             # ★ Recommended entry point
+└── .env                  # Environment variables
+```
+
+---
+
+## Basic usage
+
+1. **Upload documents**: go to "Documents" → drag & drop PDF, audio, video, or paste a YouTube URL
+2. **Explore the Wiki**: extracted concepts appear in the Wiki section with articles and relationships
+3. **Chat**: go to "Chat" → ask questions about your documents
+4. **Visualize the graph**: explore concept connections in the interactive graph view
+
+---
+
+## License
+
+**GNU Affero General Public License v3.0 (AGPLv3)** — see `LICENSE` file.
