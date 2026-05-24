@@ -2,6 +2,14 @@
 echo Starting MNEMOS in Dev Mode (Hot Reload)...
 echo.
 
+:: --- LLAMACPP PREFLIGHT ---
+echo [llamacpp] Checking for updates with fallback protection...
+powershell -ExecutionPolicy Bypass -File "%~dp0llamacpp-preflight.ps1"
+if %errorlevel% neq 0 (
+    echo [llamacpp] Preflight warning - continuing anyway
+)
+:: ---------------------------
+
 :: --- AUTO CLEANUP ORPHANED IMAGES ---
 echo Cleaning up orphaned images...
 docker image prune -f >nul 2>&1
@@ -28,6 +36,11 @@ docker-compose -f docker-compose.yml %DOCKER_ARGS% app worker llamacpp mcp db re
 
 echo Waiting for backend to be ready (15s)...
 timeout /t 15 /nobreak >nul
+
+:: --- LLAMACPP HEALTHCHECK ---
+echo [llamacpp] Checking container health (will fall back if broken)...
+powershell -ExecutionPolicy Bypass -File "%~dp0llamacpp-healthcheck.ps1"
+:: ---------------------------
 
 echo Starting Angular dev server in new window...
 cd frontend_spa

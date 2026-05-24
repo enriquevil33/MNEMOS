@@ -79,6 +79,12 @@ class Settings(BaseSettings):
     CHUNK_SIZE: int = 1024
     CHUNK_OVERLAP: int = 100
     
+    # Vision / Diagram Extraction
+    VISION_ENABLED: bool = False          # Set True to describe diagrams via vision LLM
+    VISION_MODEL: str = ""                # Override model for vision calls (e.g. deepseek-vl2). Empty = use active LLM model.
+    VISION_SKIP_UNKNOWN_MODELS: bool = True  # Skip vision call if model isn't in the known-vision allowlist
+    DIAGRAMS_MAX_PER_DOC: int = 50        # Safety cap: max images extracted per document
+
     # Storage
     # In docker, mapped to /app/uploads
     # Default to a local 'uploads' directory for Windows dev

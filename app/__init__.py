@@ -1,6 +1,17 @@
-from flask import Flask
+import logging
+import os
+import time
+import threading
+from flask import Flask, jsonify
+from sqlalchemy import text
 from config.settings import settings
 from app.extensions import db, migrate, celery_app, limiter
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 def create_app():
     app = Flask(__name__)
@@ -13,6 +24,11 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SECRET_KEY"] = settings.SECRET_KEY
     app.config["MAX_CONTENT_LENGTH"] = settings.MAX_CONTENT_LENGTH
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_size": 20,
+        "pool_recycle": 1800,
+        "pool_pre_ping": True,
+    }
     app.config.from_prefixed_env()
 
     # Initialize extensions
@@ -57,8 +73,37 @@ def create_app():
     app.register_blueprint(wiki_bp)
     from app.api.videomix import bp as videomix_bp
     app.register_blueprint(videomix_bp)
-    
-    from sqlalchemy import text
+
+    _health_cache: dict = {"result": None, "at": 0.0}
+    _health_lock = threading.Lock()
+
+    @app.get('/api/health')
+    def health():
+        now = time.monotonic()
+        with _health_lock:
+            cached = _health_cache["result"]
+            if cached is not None and now - _health_cache["at"] < 5.0:
+                return jsonify(cached[0]), cached[1]
+
+        checks = {"db": False, "redis": False}
+        try:
+            db.session.execute(text("SELECT 1"))
+            checks["db"] = True
+        except Exception:
+            pass
+        try:
+            celery_app.backend.client.ping()
+            checks["redis"] = True
+        except Exception:
+            pass
+        ok = all(checks.values())
+        payload = {"status": "ok" if ok else "degraded", **checks}
+        code = 200 if ok else 503
+        with _health_lock:
+            _health_cache["result"] = (payload, code)
+            _health_cache["at"] = now
+        return jsonify(payload), code
+
     from sqlalchemy.exc import SQLAlchemyError
     # Import models to ensure they are registered with SQLAlchemy
     with app.app_context():
@@ -86,20 +131,17 @@ def create_app():
             # Create all tables based on the model definitions
             # This is idempotent - it won't recreate existing tables
             db.create_all()
-            print("Database tables created successfully")
+            logger.info("Database tables created successfully")
 
         except SQLAlchemyError as e:
-            print(f"Database initialization note: {e}")
-            pass
-            pass
+            logger.warning(f"Database initialization: {e}")
 
         # Create VideoMix output directory
         try:
-            import os
             videomix_output_dir = os.path.join(settings.UPLOAD_FOLDER, 'videomix_output')
             os.makedirs(videomix_output_dir, exist_ok=True)
-            print(f"VideoMix output directory ready: {videomix_output_dir}")
+            logger.info(f"VideoMix output directory ready: {videomix_output_dir}")
         except Exception as e:
-            print(f"Warning: Could not create VideoMix output directory: {e}")
+            logger.warning(f"Could not create VideoMix output directory: {e}")
 
     return app

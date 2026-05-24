@@ -5,8 +5,6 @@ from app.extensions import db
 from sqlalchemy.exc import IntegrityError
 from uuid import UUID
 
-# Configure Logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('collections', __name__, url_prefix='/api/collections')

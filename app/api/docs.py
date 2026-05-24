@@ -1,8 +1,9 @@
 from flask import Blueprint, send_file, jsonify, current_app
 import os
-import json
 
 bp = Blueprint('docs', __name__, url_prefix='/api/docs')
+
+
 
 @bp.route('/', methods=['GET'])
 def swagger_ui():

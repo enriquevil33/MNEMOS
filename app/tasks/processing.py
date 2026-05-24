@@ -3,6 +3,7 @@ from app.models.document import Document
 from app.models.chunk import Chunk
 from app.services.transcription import TranscriptionService
 from app.services.pdf_processor import PDFProcessor
+from app.services.vision_service import VisionService
 from app.services.chunker import ChunkerService
 from app.services.epub_processor import EpubProcessor
 from app.services.embedder import EmbedderService
@@ -22,7 +23,7 @@ from app.utils.hf_downloader import HFDownloader
 # Configure Logger for Worker
 logger = logging.getLogger(__name__)
 
-@celery_app.task(bind=True)
+@celery_app.task(bind=True, max_retries=2, soft_time_limit=3300, time_limit=3600)
 def process_document_task(self, document_id: str):
     """
     Background task to process uploaded documents (PDF, Audio, Video, YouTube).
@@ -159,7 +160,7 @@ def process_document_task(self, document_id: str):
                 processor = PDFProcessor()
                 logger.info(f"Extracting text from PDF: {full_path}")
                 pages, metadata = processor.extract_text(full_path)
-                
+
                 # Update Metadata
                 if metadata:
                     logger.info(f"Found metadata: {metadata}")
@@ -169,7 +170,7 @@ def process_document_task(self, document_id: str):
 
                 chunker = ChunkerService()
                 logger.info(f"Chunking {len(pages)} pages of text")
-                
+
                 for page in pages:
                     sub_chunks = chunker.chunk_text(page["text"])
                     for i, sub in enumerate(sub_chunks):
@@ -180,6 +181,28 @@ def process_document_task(self, document_id: str):
                             "page": page["page"],
                             "chunk_index": i
                         })
+
+                # Diagram extraction (opt-in via VISION_ENABLED)
+                if settings.VISION_ENABLED:
+                    try:
+                        diagrams_dir = os.path.join(settings.UPLOAD_FOLDER, 'diagrams', str(doc.id))
+                        images = processor.extract_images(full_path, diagrams_dir)[:settings.DIAGRAMS_MAX_PER_DOC]
+                        logger.info(f"Found {len(images)} diagram(s) in PDF")
+
+                        vision = VisionService()
+                        for img in images:
+                            description = vision.describe_image(img["image_path"], page_number=img["page"])
+                            if description:
+                                rel_path = os.path.relpath(img["image_path"], settings.UPLOAD_FOLDER)
+                                text_chunks.append({
+                                    "text": f"[Diagram on page {img['page']}] {description}".replace('\x00', ''),
+                                    "page": img["page"],
+                                    "chunk_index": len(text_chunks),
+                                    "chunk_type": "diagram",
+                                    "image_path": rel_path,
+                                })
+                    except Exception as diag_e:
+                        logger.error(f"Diagram extraction failed: {diag_e}")
 
             elif doc.file_type == 'epub':
                 full_path = os.path.join(settings.UPLOAD_FOLDER, doc.file_path)
@@ -280,6 +303,7 @@ def process_document_task(self, document_id: str):
 
                     chunk_rows = []
                     for j, chunk_data in enumerate(batch_data):
+                        chunk_meta = {k: chunk_data[k] for k in ("chunk_type", "image_path") if chunk_data.get(k)} or None
                         chunk_rows.append(Chunk(
                             document_id=doc.id,
                             content=chunk_data["text"],
@@ -288,7 +312,8 @@ def process_document_task(self, document_id: str):
                             end_time=chunk_data.get("end"),
                             page_number=chunk_data.get("page"),
                             embedding=batch_embeddings[j],
-                            language=doc_language
+                            language=doc_language,
+                            metadata_=chunk_meta
                         ))
                     db.session.add_all(chunk_rows)
                     db.session.flush()
@@ -353,7 +378,7 @@ def _generate_summary_logic(document_id):
     except Exception as e:
         logger.error(f"Failed to generate summary (wrapper): {e}")
 
-@celery_app.task(bind=True)
+@celery_app.task(bind=True, max_retries=2, soft_time_limit=1800, time_limit=2000)
 def generate_summary_task(self, document_id: str):
     """
     Standalone task to generate summary (e.g. retry).
@@ -391,7 +416,7 @@ def generate_summary_task(self, document_id: str):
                 pass
             raise e
 
-@celery_app.task(bind=True)
+@celery_app.task(bind=True, max_retries=2, soft_time_limit=1800, time_limit=2000)
 def reprocess_hypergraph_task(self, document_id: str):
     """
     Task to specifically re-run hypergraph extraction for a document.

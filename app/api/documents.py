@@ -10,8 +10,6 @@ from app.utils.archive import archive_file
 import os
 from uuid import uuid4
 
-# Configure Logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('documents', __name__, url_prefix='/api/documents')

@@ -44,8 +44,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-      llamacpp:
-        condition: service_healthy
     deploy:
       resources:
         reservations:
@@ -84,8 +82,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-      llamacpp:
-        condition: service_healthy
     deploy:
       resources:
         reservations:
@@ -97,10 +93,12 @@ services:
       - "host.docker.internal:host-gateway"
 
   llamacpp:
-    # Rolling release - pulls latest version
-    # Run 'docker compose pull llamacpp' to get updates
+    # Rolling release with automatic fallback. llamacpp-preflight.ps1 backs
+    # up the current image before pulling the latest. If the new image fails
+    # health checks, llamacpp-healthcheck.ps1 reverts to the previous version.
+    # The next restart will try the latest again (may be fixed).
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
-    pull_policy: always
+    pull_policy: missing
     ports:
       - "8082:8080"
     environment:

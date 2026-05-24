@@ -54,4 +54,4 @@ EXPOSE 5000
 ENTRYPOINT ["./entrypoint.sh"]
 
 # Default command
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "-w", "1", "--timeout", "1800", "app:create_app()"]
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "-w", "4", "--threads", "2", "--timeout", "1800", "--access-logfile", "-", "app:create_app()"]
