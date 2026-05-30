@@ -6,6 +6,7 @@ class LLMProvider(str, Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     GROQ = "groq"
+    DEEPSEEK = "deepseek"
     LM_STUDIO = "lm_studio"
     LLAMACPP = "llamacpp"
     OLLAMA = "ollama"
@@ -37,6 +38,10 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
     
+    # DeepSeek
+    DEEPSEEK_API_KEY: str = ""
+    DEEPSEEK_MODEL: str = "deepseek-chat"
+
     # Cerebras
     CEREBRAS_API_KEY: str = ""
     CEREBRAS_MODEL: str = "llama-3.3-70b"
@@ -75,6 +80,10 @@ class Settings(BaseSettings):
     WHISPER_MODEL: str = "base"  # tiny, base, small, medium, large-v3
     WHISPER_DEVICE: str = "cuda"  # cpu, cuda
     
+    # Hypergraph LLM provider (default: llamacpp to reduce API costs)
+    # Set empty ("") to use the same provider as chat.
+    HYPERGRAPH_LLM_PROVIDER: str = ""
+
     # Chunking
     CHUNK_SIZE: int = 1024
     CHUNK_OVERLAP: int = 100

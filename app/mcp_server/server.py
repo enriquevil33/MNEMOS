@@ -554,8 +554,9 @@ def search_similar_documents(query: str, top_k: int = 5) -> str:
                     summary_preview = doc.summary[:300] + "..." if len(doc.summary) > 300 else doc.summary
                     output += f"- **Summary:** {summary_preview}\n"
 
-                if doc.collection:
-                    output += f"- **Collection:** {doc.collection.name}\n"
+                if doc.collections:
+                    coll_names = ", ".join(c.name for c in doc.collections)
+                    output += f"- **Collections:** {coll_names}\n"
 
                 output += "\n"
 
@@ -704,7 +705,6 @@ def add_document_to_collection(document_id: str, collection_id: str) -> str:
         - add_document_to_collection("doc-uuid", "collection-uuid")
     """
     try:
-        # Validate UUIDs
         error = _validate_uuid(document_id, "document_id")
         if error:
             return error + _version_footer()
@@ -722,9 +722,9 @@ def add_document_to_collection(document_id: str, collection_id: str) -> str:
             if not collection:
                 return f"Error: Collection {collection_id} not found." + _version_footer()
 
-            # Add to collection
-            document.collection_id = collection.id
-            db.session.commit()
+            if document not in collection.documents:
+                collection.documents.append(document)
+                db.session.commit()
 
             output = f"✅ Document added to collection\n\n"
             output += f"- **Document:** {document.original_filename}\n"
@@ -737,21 +737,26 @@ def add_document_to_collection(document_id: str, collection_id: str) -> str:
         return f"Error adding document to collection: {str(e)}" + _version_footer()
 
 @mcp.tool()
-def remove_document_from_collection(document_id: str) -> str:
+def remove_document_from_collection(document_id: str, collection_id: str) -> str:
     """
-    Remove a document from its collection (document remains in system).
+    Remove a document from a specific collection (document remains in system).
 
     Args:
         document_id: UUID of the document
+        collection_id: UUID of the collection to remove from
 
     Returns:
         Success message.
 
     Example:
-        - remove_document_from_collection("doc-uuid")
+        - remove_document_from_collection("doc-uuid", "collection-uuid")
     """
     try:
         error = _validate_uuid(document_id, "document_id")
+        if error:
+            return error + _version_footer()
+
+        error = _validate_uuid(collection_id, "collection_id")
         if error:
             return error + _version_footer()
 
@@ -760,16 +765,19 @@ def remove_document_from_collection(document_id: str) -> str:
             if not document:
                 return f"Error: Document {document_id} not found." + _version_footer()
 
-            if not document.collection_id:
-                return f"Document {document.original_filename} is not in any collection." + _version_footer()
+            collection = Collection.query.get(collection_id)
+            if not collection:
+                return f"Error: Collection {collection_id} not found." + _version_footer()
 
-            old_collection_name = document.collection.name if document.collection else "Unknown"
-            document.collection_id = None
+            if document not in collection.documents:
+                return f"Document {document.original_filename} is not in collection '{collection.name}'." + _version_footer()
+
+            collection.documents.remove(document)
             db.session.commit()
 
             output = f"✅ Document removed from collection\n\n"
             output += f"- **Document:** {document.original_filename}\n"
-            output += f"- **Former Collection:** {old_collection_name}\n"
+            output += f"- **Collection:** {collection.name}\n"
 
             return output + _version_footer()
 
@@ -994,6 +1002,14 @@ def upload_document(file_path: str, file_type: str = "auto", collection_id: str 
             doc.file_path = unique_name
 
             db.session.add(doc)
+            db.session.flush()
+
+            # Also add to M2M junction
+            if collection_id:
+                coll = Collection.query.get(collection_id)
+                if coll and doc not in coll.documents:
+                    coll.documents.append(doc)
+
             db.session.commit()
 
             # Queue processing
@@ -1055,6 +1071,14 @@ def add_youtube_video(youtube_url: str, collection_id: str = None) -> str:
             )
 
             db.session.add(doc)
+            db.session.flush()
+
+            # Also add to M2M junction
+            if collection_id:
+                coll = Collection.query.get(collection_id)
+                if coll and doc not in coll.documents:
+                    coll.documents.append(doc)
+
             db.session.commit()
 
             # Queue processing
@@ -1663,8 +1687,9 @@ def list_documents() -> str:
 
             for doc in docs:
                 output += f"- {_format_document(doc)}\n"
-                if doc.collection:
-                    output += f"  _Collection: {doc.collection.name}_\n"
+                if doc.collections:
+                    coll_names = ", ".join(c.name for c in doc.collections)
+                    output += f"  _Collections: {coll_names}_\n"
 
             output += f"\n💡 Use get_document_details(id) for full information about any document.\n"
 

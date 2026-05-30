@@ -36,9 +36,18 @@ def list_documents():
     
     if collection_id:
         if collection_id == 'null':
-             query = query.filter(Document.collection_id.is_(None))
+            query = query.filter(Document.collection_id.is_(None))
         else:
-             query = query.filter(Document.collection_id == collection_id)
+            from app.models.collection_document import collection_documents
+            query = query.outerjoin(
+                collection_documents,
+                Document.id == collection_documents.c.document_id
+            ).filter(
+                db.or_(
+                    Document.collection_id == collection_id,
+                    collection_documents.c.collection_id == collection_id
+                )
+            ).distinct()
              
     documents = query.order_by(Document.created_at.desc()).all()
     
@@ -234,6 +243,11 @@ def update_document(doc_id):
                 doc.collection_id = None
             else:
                 doc.collection_id = col_id
+                # Also sync M2M: ensure doc is in this collection
+                from app.models.collection import Collection
+                coll = db.session.query(Collection).get(col_id)
+                if coll and doc not in coll.documents:
+                    coll.documents.append(doc)
         
         db.session.commit()
         logger.info(f"Document updated: {doc_id}")
@@ -388,3 +402,12 @@ def reprocess_hypergraph():
         
     logger.info(f"Queued hypergraph reprocessing for {count} documents.")
     return jsonify({'status': 'queued', 'count': count, 'message': f'Started reprocessing {count} documents'}), 202
+
+@bp.route('/<string:document_id>/collections', methods=['GET'])
+def get_document_collections(document_id):
+    """List all collections for a document."""
+    from app.models.collection import Collection
+    doc = db.session.query(Document).get(document_id)
+    if not doc:
+        return jsonify({'error': 'Document not found'}), 404
+    return jsonify([c.to_dict() for c in doc.collections])

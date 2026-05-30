@@ -33,7 +33,11 @@ class Document(db.Model):
     language = Column(String(50), default='english') # 'english', 'spanish', 'german', etc.
     summary = Column(Text)
 
-    collection = relationship('Collection', backref='documents')
+    # Single-collection FK (backward compat, deprecated)
+    collection = relationship('Collection', foreign_keys=[collection_id])
+
+    # Many-to-many via junction table
+    collections = relationship('Collection', secondary='collection_documents', back_populates='documents')
 
 
     def to_dict(self):
@@ -48,6 +52,7 @@ class Document(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "metadata": self.metadata_,
             "collection_id": str(self.collection_id) if self.collection_id else None,
+            "collection_ids": [str(c.id) for c in self.collections] if self.collections else [],
             "tag": self.tag,
             "stars": self.stars,
             "comment": self.comment,

@@ -63,6 +63,8 @@ export interface ChatPreferences {
   llm_frequency_penalty?: number;
   llm_presence_penalty?: number;
   archive_enabled?: boolean;
+  hypergraph_llm_provider?: string;
+  hypergraph_llm_model?: string;
 }
 
 export interface LLMConnection {

@@ -123,7 +123,19 @@ def create_app():
         except SQLAlchemyError:
             db.session.rollback()
             pass
-        
+
+        try:
+            db.session.execute(text(
+                "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS hypergraph_llm_provider VARCHAR(50) DEFAULT ''"
+            ))
+            db.session.execute(text(
+                "ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS hypergraph_llm_model VARCHAR(255) DEFAULT ''"
+            ))
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            pass
+
         try:
             # Import models so SQLAlchemy knows about them
             from app import models
@@ -133,7 +145,19 @@ def create_app():
             db.create_all()
             logger.info("Database tables created successfully")
 
+            # Migrate existing collection_id FK data into junction table
+            from sqlalchemy import text as sql_text
+            db.session.execute(sql_text("""
+                INSERT INTO collection_documents (collection_id, document_id)
+                SELECT collection_id, id FROM documents
+                WHERE collection_id IS NOT NULL
+                ON CONFLICT (collection_id, document_id) DO NOTHING
+            """))
+            db.session.commit()
+            logger.info("Legacy collection_id data migrated to collection_documents junction")
+
         except SQLAlchemyError as e:
+            db.session.rollback()
             logger.warning(f"Database initialization: {e}")
 
         # Create VideoMix output directory

@@ -64,6 +64,10 @@ class UserPreferences(db.Model):
     openai_tts_model = db.Column(db.String(50), default='tts-1', nullable=True)
     openai_stt_model = db.Column(db.String(50), default='whisper-1', nullable=True)
 
+    # Hypergraph LLM provider override (empty = use chat provider)
+    hypergraph_llm_provider = db.Column(db.String(50), default="", nullable=True)
+    hypergraph_llm_model = db.Column(db.String(255), nullable=True)
+
     # Archive Settings
     archive_enabled = db.Column(db.Boolean, default=False, nullable=False)
 
@@ -110,6 +114,8 @@ class UserPreferences(db.Model):
             'tts_enabled': self.tts_enabled,
             'openai_tts_model': self.openai_tts_model,
             'openai_stt_model': self.openai_stt_model,
+            'hypergraph_llm_provider': self.hypergraph_llm_provider or "",
+            'hypergraph_llm_model': self.hypergraph_llm_model or "",
             'archive_enabled': self.archive_enabled,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()

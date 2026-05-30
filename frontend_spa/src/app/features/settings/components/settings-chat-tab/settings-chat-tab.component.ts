@@ -20,6 +20,7 @@ export class SettingsChatTabComponent {
 
     chatSelector = viewChild<LlmSelectorComponent>('chatSelector');
     memorySelector = viewChild<LlmSelectorComponent>('memorySelector');
+    hypergraphSelector = viewChild<LlmSelectorComponent>('hypergraphSelector');
 
     memoryLlmPreferences = computed(() => {
         const prefs = this.settingsService.chatPreferences();
@@ -28,6 +29,16 @@ export class SettingsChatTabComponent {
             ...prefs,
             llm_provider: prefs.memory_provider,
             selected_llm_model: prefs.memory_llm_model
+        } as ChatPreferences;
+    });
+
+    hypergraphLlmPreferences = computed(() => {
+        const prefs = this.settingsService.chatPreferences();
+        if (!prefs) return null;
+        return {
+            ...prefs,
+            llm_provider: prefs.hypergraph_llm_provider || 'llamacpp',
+            selected_llm_model: prefs.hypergraph_llm_model || undefined
         } as ChatPreferences;
     });
 
@@ -82,10 +93,26 @@ export class SettingsChatTabComponent {
                 if (snapshot.local_llm_base_url) memUpdate.local_llm_base_url = snapshot.local_llm_base_url;
             }
 
+            const hyperSel = this.hypergraphSelector();
+            let hyperUpdate: any = {};
+
+            if (hyperSel) {
+                const snapshot = hyperSel.getSnapshot();
+                hyperUpdate.hypergraph_llm_provider = snapshot.llm_provider;
+                hyperUpdate.hypergraph_llm_model = snapshot.selected_llm_model;
+
+                if (snapshot.openai_api_key) hyperUpdate.openai_api_key = snapshot.openai_api_key;
+                if (snapshot.anthropic_api_key) hyperUpdate.anthropic_api_key = snapshot.anthropic_api_key;
+                if (snapshot.groq_api_key) hyperUpdate.groq_api_key = snapshot.groq_api_key;
+                if (snapshot.custom_api_key) hyperUpdate.custom_api_key = snapshot.custom_api_key;
+                if (snapshot.local_llm_base_url) hyperUpdate.local_llm_base_url = snapshot.local_llm_base_url;
+            }
+
             const finalPrefs: ChatPreferences = {
                 ...currentPrefs,
                 ...chatUpdate,
-                ...memUpdate
+                ...memUpdate,
+                ...hyperUpdate
             };
 
             await this.settingsService.saveChatPreferences(finalPrefs);

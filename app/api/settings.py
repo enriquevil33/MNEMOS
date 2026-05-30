@@ -969,6 +969,8 @@ def get_chat_settings():
         "llm_frequency_penalty": getattr(prefs, 'llm_frequency_penalty', 0.3),
         "llm_presence_penalty": getattr(prefs, 'llm_presence_penalty', 0.1),
         "retrieval_top_k": getattr(prefs, 'retrieval_top_k', 10),
+        "hypergraph_llm_provider": getattr(prefs, 'hypergraph_llm_provider', '') or '',
+        "hypergraph_llm_model": getattr(prefs, 'hypergraph_llm_model', '') or '',
         "archive_enabled": getattr(prefs, 'archive_enabled', False),
     })
 
@@ -1111,6 +1113,11 @@ def save_chat_settings():
 
     if 'retrieval_top_k' in data:
         prefs.retrieval_top_k = max(1, min(50, int(data['retrieval_top_k'])))
+
+    if 'hypergraph_llm_provider' in data:
+        prefs.hypergraph_llm_provider = data['hypergraph_llm_provider'] or ""
+    if 'hypergraph_llm_model' in data:
+        prefs.hypergraph_llm_model = data['hypergraph_llm_model'] or ""
 
     if 'archive_enabled' in data:
         prefs.archive_enabled = bool(data['archive_enabled'])

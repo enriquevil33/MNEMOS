@@ -2,7 +2,9 @@ from app.extensions import db
 from app.models.knowledge_graph import Concept, HyperEdge, HyperEdgeMember
 from app.models.document import Document
 from app.models.chunk import Chunk
-from app.services.llm_client import get_llm_client
+from app.models.user_preferences import UserPreferences
+from app.services.llm_client import LLMClient, get_llm_client
+from config.settings import LLMProvider, settings
 from app.services.embedder import EmbedderService
 import json
 import logging
@@ -106,13 +108,12 @@ def _extract_batch(batch_idx: int, total: int, context_text: str, first_chunk_id
             data = _parse_response(response)
         except Exception as e:
             logger.warning(f"Batch {batch_idx}: parse failed ({e}). Retrying once.")
+            is_empty = not response or not response.strip()
+            context_hint = "" if is_empty else f"\n\nPrevious attempt (failed):\n{response[:500]}"
             retry_prompt = f"""
             The previous JSON output had an error: {e}
             Output VALID JSON only matching this structure:
-            {{"events": [{{"source": ["A"], "relation": "r", "target": ["B"]}}], "definitions": {{"A": "def"}}}}
-
-            Previous attempt:
-            {response[:500]}
+            {{"events": [{{"source": ["A"], "relation": "r", "target": ["B"]}}], "definitions": {{"A": "def"}}}}{context_hint}
             """
             retry = llm.chat(
                 system="You are a JSON validator. Output only valid JSON.",
@@ -188,7 +189,23 @@ class HypergraphExtractor:
             # ---- PASS 1: parallel LLM extraction, no DB writes ----
             # Instantiate one fresh client in the main thread — all workers share
             # it so they can't inherit a stale thread-local client from prior tasks.
-            llm = get_llm_client()
+            hyper_provider = None
+            hyper_model = None
+            try:
+                prefs = db.session.query(UserPreferences).first()
+                if prefs and prefs.hypergraph_llm_provider:
+                    hyper_provider = prefs.hypergraph_llm_provider
+                    hyper_model = prefs.hypergraph_llm_model or None
+            except Exception:
+                pass
+            if not hyper_provider:
+                hyper_provider = settings.HYPERGRAPH_LLM_PROVIDER
+            if hyper_provider:
+                logger.info(f"Hypergraph using LLM provider: {hyper_provider} model: {hyper_model or 'default'}")
+                llm = LLMClient(provider=LLMProvider(hyper_provider), model=hyper_model)
+            else:
+                logger.info("Hypergraph using default chat LLM provider")
+                llm = get_llm_client()
             results = []
             with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
                 futures = {

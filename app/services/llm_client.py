@@ -56,6 +56,7 @@ class LLMClient:
         s_anthropic_key = settings.ANTHROPIC_API_KEY
         s_groq_key = settings.GROQ_API_KEY
         s_cerebras_key = getattr(settings, 'CEREBRAS_API_KEY', None)
+        s_deepseek_key = getattr(settings, 'DEEPSEEK_API_KEY', None)
 
         self.ollama_num_ctx = db_prefs.ollama_num_ctx if db_prefs else settings.OLLAMA_NUM_CTX
 
@@ -101,6 +102,14 @@ class LLMClient:
                 api_key=key
             )
             self.model = model or settings.CEREBRAS_MODEL
+
+        elif self.provider == LLMProvider.DEEPSEEK:
+            key = api_key or s_deepseek_key
+            self.client = OpenAI(
+                base_url="https://api.deepseek.com/v1",
+                api_key=key
+            )
+            self.model = model or settings.DEEPSEEK_MODEL
 
         elif self.provider == LLMProvider.LM_STUDIO:
             url = base_url or d_local_base_url or s_local_base_url
@@ -159,6 +168,7 @@ class LLMClient:
             self.model = model or s_local_model
 
         # Providers that support strict json_schema structured output
+        # DeepSeek only supports json_object, not json_schema.
         self.supports_json_schema = self.provider in (
             LLMProvider.OPENAI,
             LLMProvider.GROQ,
@@ -168,10 +178,12 @@ class LLMClient:
 
     def chat(self, system: str, messages: list, images: list = None, model: str = None, json_schema: dict = None) -> str:
         """
-        Unified chat method.
-        messages format: [{"role": "user", "content": "..."}]
-        images: list of base64 strings (optional)
-        model: optional model name to override the default/selected model
+        Chat with the LLM.
+
+        system: system prompt
+        messages: list of {"role": "user"|"assistant", "content": str}
+        images: optional list of base64-encoded images
+        model: override the default model
         json_schema: optional JSON schema dict to force structured output
         """
         active_model = model or model_manager.get_model() or self.model

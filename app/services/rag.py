@@ -21,6 +21,7 @@ _MODEL_CTX = {
     "claude": 200000,
     "llama": 4096,
     "mistral": 32768,
+    "deepseek": 65536,
     "default": 8192,
 }
 

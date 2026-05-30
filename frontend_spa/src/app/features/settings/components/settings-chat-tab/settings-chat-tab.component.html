@@ -153,6 +153,13 @@
         </div>
     </div>
 
+    <!-- Hypergraph Extraction -->
+    <div class="bg-panel border border-divider rounded-xl p-4 sm:p-6">
+        <h2 class="text-lg font-semibold mb-4">Hypergraph Extraction</h2>
+        <p class="text-xs text-secondary mb-4">Override the LLM used for knowledge graph extraction. Defaults to the main chat provider.</p>
+        <app-llm-selector #hypergraphSelector [preferences]="hypergraphLlmPreferences()" />
+    </div>
+
     <!-- Archive Settings -->
     <div class="bg-panel border border-divider rounded-xl p-4 sm:p-6">
         <div class="flex items-center justify-between mb-2">
