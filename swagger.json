@@ -132,6 +132,14 @@
             "nullable": true,
             "example": "b4c2d3e4-6f7a-8b9c-0d1e-2f3a4b5c6d7e"
           },
+          "collection_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": ["c5d3e4f5-7a8b-9c0d-1e2f-3a4b5c6d7e8f"]
+          },
           "tag": {
             "type": "string",
             "nullable": true,
@@ -423,6 +431,16 @@
             "type": "number",
             "format": "float",
             "example": 0.9
+          },
+          "hypergraph_llm_provider": {
+            "type": "string",
+            "example": "openai",
+            "description": "LLM provider for hypergraph extraction. Empty string inherits the chat provider."
+          },
+          "hypergraph_llm_model": {
+            "type": "string",
+            "example": "gpt-4",
+            "description": "Model name for hypergraph extraction when a custom provider is set."
           }
         }
       },
@@ -1365,6 +1383,178 @@
           },
           "404": {
             "description": "Collection not found"
+          }
+        }
+      }
+    },
+    "/api/collections/{id}/documents": {
+      "get": {
+        "tags": ["Collections"],
+        "summary": "List documents in collection",
+        "description": "Retrieve all documents belonging to a collection (many-to-many).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of documents in the collection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Document"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Collection not found"
+          }
+        }
+      }
+    },
+    "/api/collections/{id}/documents/{document_id}": {
+      "post": {
+        "tags": ["Collections"],
+        "summary": "Add document to collection",
+        "description": "Add a document to a collection via many-to-many relationship.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document added to collection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Collection or document not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Collections"],
+        "summary": "Remove document from collection",
+        "description": "Remove a document from a collection.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document removed from collection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Collection or document not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/documents/{document_id}/collections": {
+      "get": {
+        "tags": ["Documents"],
+        "summary": "List collections for a document",
+        "description": "Retrieve all collections a document belongs to.",
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of collections for the document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Collection"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Document not found"
           }
         }
       }
