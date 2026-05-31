@@ -1,7 +1,7 @@
 
 <div align="center" style="position: relative; max-width: 700px; margin: 0 auto; border-radius: 16px; overflow: hidden;">
   <img src="frontend_spa/public/mnemosyne-awa-optimized.gif" alt="MNEMOS background" style="width: 100%; display: block;">
-  <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.3);">
+  <div align="center" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.3);">
     <img src="frontend_spa/public/favicon.svg" alt="MNEMOS icon" style="width: 64px; height: 64px; margin-bottom: 8px;">
     <h1 style="font-family: 'Georgia', 'Times New Roman', serif; font-size: clamp(2rem, 6vw, 4rem); font-weight: 700; color: white; text-shadow: 0 2px 12px rgba(0,0,0,0.6); margin: 0; letter-spacing: 0.05em;">MNEMOS</h1>
     <p style="font-family: sans-serif; font-size: clamp(0.9rem, 2vw, 1.2rem); color: rgba(255,255,255,0.85); margin: 4px 0 0 0; text-shadow: 0 1px 6px rgba(0,0,0,0.5);">Context Daemon</p>
@@ -515,7 +515,14 @@ flask run --debug
 <br>
 <br>
 
-# MNEMOS — Context Daemon
+<div align="center" style="position: relative; max-width: 700px; margin: 0 auto; border-radius: 16px; overflow: hidden;">
+  <img src="frontend_spa/public/mnemosyne-awa-optimized.gif" alt="MNEMOS background" style="width: 100%; display: block;">
+  <div align="center" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.3);">
+    <img src="frontend_spa/public/favicon.svg" alt="MNEMOS icon" style="width: 64px; height: 64px; margin-bottom: 8px;">
+    <h1 style="font-family: 'Georgia', 'Times New Roman', serif; font-size: clamp(2rem, 6vw, 4rem); font-weight: 700; color: white; text-shadow: 0 2px 12px rgba(0,0,0,0.6); margin: 0; letter-spacing: 0.05em;">MNEMOS</h1>
+    <p style="font-family: sans-serif; font-size: clamp(0.9rem, 2vw, 1.2rem); color: rgba(255,255,255,0.85); margin: 4px 0 0 0; text-shadow: 0 1px 6px rgba(0,0,0,0.5);">Context Daemon</p>
+  </div>
+</div>
 
 ---
 
