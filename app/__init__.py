@@ -136,6 +136,18 @@ def create_app():
             db.session.rollback()
             pass
 
+        # Pre-warm the embedding model in background so first wiki fuzzy lookup is fast
+        try:
+            def _warm_embedder():
+                from app.services.embedder import EmbedderService
+                logger.info("Pre-warming embedding model...")
+                EmbedderService.get_instance()
+                logger.info("Embedding model ready.")
+            t = threading.Thread(target=_warm_embedder, daemon=True)
+            t.start()
+        except Exception as e:
+            logger.warning(f"Embedding model pre-warm failed (will load on demand): {e}")
+
         try:
             # Import models so SQLAlchemy knows about them
             from app import models

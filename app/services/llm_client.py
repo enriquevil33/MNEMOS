@@ -168,10 +168,15 @@ class LLMClient:
             self.model = model or s_local_model
 
         # Providers that support strict json_schema structured output
-        # DeepSeek only supports json_object, not json_schema.
+        # deepseek-v4-pro doesn't support any response_format; flash does (json_object).
         self.supports_json_schema = self.provider in (
             LLMProvider.OPENAI,
             LLMProvider.GROQ,
+        )
+        self.supports_json_object = self.provider in (
+            LLMProvider.OPENAI,
+            LLMProvider.GROQ,
+            LLMProvider.DEEPSEEK,
         )
 
         logger.debug(f"LLMClient Initialized. Provider: {self.provider}. Base URL: {self.client.base_url}")
@@ -289,10 +294,13 @@ class LLMClient:
                             "type": "json_schema",
                             "json_schema": json_schema
                         }
-                    else:
-                        # Provider only supports basic JSON mode — the prompt already
-                        # describes the required structure, so this is sufficient.
+                    elif self.supports_json_object:
                         request_params["response_format"] = {"type": "json_object"}
+                    else:
+                        # Provider doesn't support any response_format — the
+                        # prompt already describes the required structure, so
+                        # this is sufficient.
+                        pass
 
                 response = self.client.chat.completions.create(**request_params)
 

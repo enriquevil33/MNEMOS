@@ -1,0 +1,7 @@
+{
+  "inputs": {
+    "spec": "Add collection and document filter to wiki page on frontend",
+    "integration": "opencode",
+    "scope": "frontend-only"
+  }
+}

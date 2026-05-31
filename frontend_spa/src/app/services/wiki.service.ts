@@ -9,9 +9,11 @@ export class WikiService {
   constructor(private http: HttpClient) {}
 
   /** Alphabetical concept list with optional letter filter and pagination. */
-  listConcepts(letter = '', limit = 100, offset = 0): Observable<WikiConceptList> {
+  listConcepts(letter = '', limit = 100, offset = 0, collectionId?: string, documentId?: string): Observable<WikiConceptList> {
     const params: Record<string, string | number> = { limit, offset };
     if (letter) params['letter'] = letter;
+    if (collectionId) params['collection_id'] = collectionId;
+    if (documentId) params['document_id'] = documentId;
     return this.http.get<WikiConceptList>(ApiEndpoints.WIKI_CONCEPTS, { params });
   }
 

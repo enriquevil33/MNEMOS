@@ -67,8 +67,10 @@ def _build_article(concept: Concept) -> dict:
             .filter(Chunk.id.in_(list(source_chunk_ids)))
             .all()
         )
+        doc_ids = {ch.document_id for ch in chunks}
+        docs = {d.id: d for d in db.session.query(Document).filter(Document.id.in_(doc_ids)).all()} if doc_ids else {}
         for ch in chunks:
-            doc = db.session.get(Document, ch.document_id)
+            doc = docs.get(ch.document_id)
             sources.append({
                 "chunk_id": str(ch.id),
                 "content": ch.content,
@@ -80,6 +82,32 @@ def _build_article(concept: Concept) -> dict:
                 "file_type": str(doc.file_type) if doc and doc.file_type else None,
                 "youtube_url": doc.youtube_url if doc else None,
             })
+
+    # 2b. If no hypergraph sources found, fall back to text search for concept name
+    if not sources:
+        fallback_chunks = (
+            db.session.query(Chunk)
+            .filter(Chunk.content.ilike(f"%{concept.name}%"))
+            .order_by(Chunk.chunk_index)
+            .limit(10)
+            .all()
+        )
+        if fallback_chunks:
+            doc_ids = {ch.document_id for ch in fallback_chunks}
+            docs = {d.id: d for d in db.session.query(Document).filter(Document.id.in_(doc_ids)).all()} if doc_ids else {}
+            for ch in fallback_chunks:
+                doc = docs.get(ch.document_id)
+                sources.append({
+                    "chunk_id": str(ch.id),
+                    "content": ch.content,
+                    "page_number": ch.page_number,
+                    "start_time": ch.start_time,
+                    "end_time": ch.end_time,
+                    "document_id": str(ch.document_id),
+                    "document_title": (doc.tag or doc.original_filename) if doc else "Unknown",
+                    "file_type": str(doc.file_type) if doc and doc.file_type else None,
+                    "youtube_url": doc.youtube_url if doc else None,
+                })
 
     # 3. Synthesize description from sources if empty
     description = concept.description or ""
@@ -119,21 +147,42 @@ def list_concepts():
     Supports ?letter=<str> to filter by first letter (case-insensitive).
         - Use 'a'-'z' for letter filtering
         - Use '#' for concepts starting with non-letters
+    Supports ?collection_id=<uuid> to filter by collection.
+    Supports ?document_id=<uuid> to filter by document.
     Supports ?limit=<int>&offset=<int> for pagination.
     """
     letter = request.args.get('letter', '').strip().lower()
     limit = request.args.get('limit', 100, type=int)
     offset = request.args.get('offset', 0, type=int)
+    collection_id = request.args.get('collection_id', '').strip()
+    document_id = request.args.get('document_id', '').strip()
 
     query = db.session.query(Concept).order_by(func.lower(Concept.name))
 
+    # Letter filter
     if letter:
         if letter == '#':
-            # Filter for concepts that don't start with a-z (PostgreSQL regex: ~)
             query = query.filter(~func.lower(Concept.name).op('~')('^[a-z]'))
         elif len(letter) == 1 and letter.isalpha():
-            # Filter for concepts starting with the specified letter
             query = query.filter(func.lower(Concept.name).startswith(letter))
+
+    # Filter by document: Concept → HyperEdgeMember → HyperEdge → Document
+    if document_id:
+        query = query.join(HyperEdgeMember, HyperEdgeMember.concept_id == Concept.id)
+        query = query.join(HyperEdge, HyperEdge.id == HyperEdgeMember.hyper_edge_id)
+        query = query.filter(HyperEdge.source_document_id == document_id)
+
+    # Filter by collection: Concept → HyperEdgeMember → HyperEdge → Document → collection_documents
+    if collection_id:
+        from app.models.collection_document import collection_documents
+        query = query.join(HyperEdgeMember, HyperEdgeMember.concept_id == Concept.id)
+        query = query.join(HyperEdge, HyperEdge.id == HyperEdgeMember.hyper_edge_id)
+        query = query.join(Document, Document.id == HyperEdge.source_document_id)
+        query = query.join(
+            collection_documents,
+            collection_documents.c.document_id == Document.id
+        )
+        query = query.filter(collection_documents.c.collection_id == collection_id)
 
     total = query.count()
     concepts = query.offset(offset).limit(limit).all()

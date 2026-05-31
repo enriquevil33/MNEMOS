@@ -1,7 +1,10 @@
 import { Component, signal, inject, OnInit, AfterViewChecked, ElementRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { WikiService } from '../../services/wiki.service';
-import { WikiConceptStub } from '@core/models';
+import { CollectionService } from '../../services/collection.service';
+import { DocumentsService } from '../../services/documents.service';
+import { WikiConceptStub, Document } from '@core/models';
+import { Collection } from '@core/models/collection.model';
 import { renderKatexInElement } from '../../shared/katex.util';
 
 @Component({
@@ -31,6 +34,36 @@ import { renderKatexInElement } from '../../shared/katex.util';
       </span>
     </div>
   </header>
+
+  <!-- Collection / Document filters -->
+  <div class="wiki-filters">
+    <select
+      class="wiki-filter-select"
+      [value]="selectedCollectionId()"
+      (change)="onCollectionChange($any($event.target).value)"
+    >
+      <option value="">All collections</option>
+      @for (col of collections(); track col.id) {
+        <option [value]="col.id">{{ col.name }}</option>
+      }
+    </select>
+
+    <select
+      class="wiki-filter-select"
+      [value]="selectedDocumentId()"
+      (change)="onDocumentChange($any($event.target).value)"
+      [disabled]="!selectedCollectionId()"
+    >
+      <option value="">All documents</option>
+      @for (doc of documents(); track doc.id) {
+        <option [value]="doc.id">{{ doc.original_filename }}</option>
+      }
+    </select>
+
+    @if (selectedCollectionId() || selectedDocumentId()) {
+      <button class="wiki-filter-clear" (click)="clearFilters()">Clear</button>
+    }
+  </div>
 
   <!-- Letter tabs (A–Z + #) -->
   <nav class="wiki-alpha-nav">
@@ -79,6 +112,8 @@ import { renderKatexInElement } from '../../shared/katex.util';
 export class WikiIndexComponent implements OnInit, AfterViewChecked {
   private router = inject(Router);
   private wikiService = inject(WikiService);
+  private collectionService = inject(CollectionService);
+  private documentsService = inject(DocumentsService);
   private el = inject(ElementRef);
   private lastRenderedCount = -1;
 
@@ -92,9 +127,17 @@ export class WikiIndexComponent implements OnInit, AfterViewChecked {
   offset = signal(0);
   readonly limit = 200;
 
+  // Filters
+  collections = signal<Collection[]>([]);
+  documents = signal<Document[]>([]);
+  selectedCollectionId = signal<string>('');
+  selectedDocumentId = signal<string>('');
+  documentsLoading = signal(false);
+
   readonly alphabetButtons = ['#', ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))];
 
   ngOnInit() {
+    this.fetchCollections();
     this.fetchAll();
   }
 
@@ -106,10 +149,51 @@ export class WikiIndexComponent implements OnInit, AfterViewChecked {
     }
   }
 
+  private fetchCollections() {
+    this.collectionService.getCollections().subscribe({
+      next: (cols) => this.collections.set(cols),
+    });
+  }
+
+  onCollectionChange(collectionId: string) {
+    this.selectedCollectionId.set(collectionId);
+    this.selectedDocumentId.set('');
+    this.activeLetter.set('');
+    if (collectionId) {
+      this.documentsLoading.set(true);
+      this.documentsService.getDocuments(collectionId).subscribe({
+        next: (docs) => {
+          this.documents.set(docs);
+          this.documentsLoading.set(false);
+        },
+        error: () => this.documentsLoading.set(false),
+      });
+    } else {
+      this.documents.set([]);
+    }
+    this.fetchAll();
+  }
+
+  onDocumentChange(documentId: string) {
+    this.selectedDocumentId.set(documentId);
+    this.activeLetter.set('');
+    this.fetchAll();
+  }
+
+  clearFilters() {
+    this.selectedCollectionId.set('');
+    this.selectedDocumentId.set('');
+    this.documents.set([]);
+    this.activeLetter.set('');
+    this.fetchAll();
+  }
+
   private fetchAll() {
     this.loading.set(true);
     const letter = this.activeLetter();
-    this.wikiService.listConcepts(letter, 500, 0).subscribe({
+    const collectionId = this.selectedCollectionId();
+    const documentId = this.selectedDocumentId();
+    this.wikiService.listConcepts(letter, 500, 0, collectionId || undefined, documentId || undefined).subscribe({
       next: (res) => {
         this.allConcepts.set(res.concepts);
         this.total.set(res.total);

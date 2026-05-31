@@ -71,6 +71,48 @@
   pointer-events: none;
 }
 
+/* Filter bar */
+.wiki-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+.wiki-filter-select {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  background: var(--color-input);
+  border: 1px solid var(--color-divider);
+  border-radius: 6px;
+  color: var(--color-primary);
+  outline: none;
+  cursor: pointer;
+  max-width: 220px;
+}
+
+.wiki-filter-select:focus {
+  border-color: var(--color-accent);
+}
+
+.wiki-filter-clear {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  background: transparent;
+  border: 1px solid var(--color-divider);
+  border-radius: 6px;
+  color: var(--color-secondary);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.wiki-filter-clear:hover {
+  color: var(--color-primary);
+  border-color: var(--color-accent);
+}
+
 /* Alphabet nav */
 .wiki-alpha-nav {
   display: flex;

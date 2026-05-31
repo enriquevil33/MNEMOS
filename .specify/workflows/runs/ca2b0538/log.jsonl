@@ -1,0 +1,6 @@
+{"event": "step_started", "step_id": "specify", "type": "command", "timestamp": "2026-05-31T19:55:07.528708+00:00"}
+{"event": "step_completed", "step_id": "specify", "status": "completed", "timestamp": "2026-05-31T19:58:18.695881+00:00"}
+{"event": "step_started", "step_id": "review-spec", "type": "gate", "timestamp": "2026-05-31T19:58:18.697879+00:00"}
+{"event": "step_completed", "step_id": "review-spec", "status": "failed", "timestamp": "2026-05-31T19:58:18.698877+00:00"}
+{"event": "workflow_aborted", "step_id": "review-spec", "timestamp": "2026-05-31T19:58:18.698877+00:00"}
+{"event": "workflow_finished", "status": "aborted", "timestamp": "2026-05-31T19:58:18.700846+00:00"}
