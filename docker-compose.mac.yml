@@ -1,0 +1,73 @@
+# MNEMOS — Mac local, sin GPU
+# Usa momo-postgres (5433) y valkey (6380) ya corriendo
+# Ollama nativo en Mac (host.docker.internal:11434)
+
+services:
+  app:
+    build: .
+    image: mnemos-backend:latest
+    ports:
+      - "8300:5000"
+    environment:
+      - FLASK_ENV=development
+      - RUN_MIGRATIONS=true
+      - DATABASE_URL=postgresql://momo:momo_local_2026@host.docker.internal:5433/mnemos_db
+      - REDIS_URL=redis://host.docker.internal:6380/0
+      - PYTHONUNBUFFERED=1
+      - LLM_PROVIDER=ollama
+      - OLLAMA_BASE_URL=http://192.168.65.254:11434/v1
+      - LOCAL_LLM_BASE_URL=http://192.168.65.254:11434/v1
+      - LOCAL_LLM_MODEL=llama3.2:3b
+      - EMBEDDING_PROVIDER=ollama
+      - EMBEDDING_MODEL=bge-m3
+      - EMBEDDING_DIMENSION=1024
+      - EMBEDDING_DEVICE=cpu
+      - EMBEDDING_USE_FP16=false
+      - EMBEDDING_BATCH_SIZE=4
+      - WHISPER_DEVICE=cpu
+      - WHISPER_MODEL=base
+      - MEMORY_ENABLED=true
+      - MEMORY_PROVIDER=ollama
+      - CHUNK_SIZE=1024
+      - CHUNK_OVERLAP=100
+      - HYPERGRAPH_LLM_PROVIDER=ollama
+      - SECRET_KEY=mnemos_siss_2026_local
+      - UPLOAD_FOLDER=/app/uploads
+      - ARCHIVE_FOLDER=/app/archive
+    volumes:
+      - ./app:/app/app:rw
+      - ./config:/app/config:rw
+      - ./migrations:/app/migrations:rw
+      - ./data/uploads:/app/uploads
+      - ./data/archive:/app/archive
+      - ./data/whisper_cache:/root/.cache/whisper
+
+  worker:
+    image: mnemos-backend:latest
+    command: celery -A app.celery_app worker --loglevel=info --pool=solo
+    environment:
+      - DATABASE_URL=postgresql://momo:momo_local_2026@host.docker.internal:5433/mnemos_db
+      - REDIS_URL=redis://host.docker.internal:6380/0
+      - PYTHONUNBUFFERED=1
+      - LLM_PROVIDER=ollama
+      - OLLAMA_BASE_URL=http://192.168.65.254:11434/v1
+      - LOCAL_LLM_BASE_URL=http://192.168.65.254:11434/v1
+      - LOCAL_LLM_MODEL=llama3.2:3b
+      - EMBEDDING_PROVIDER=ollama
+      - EMBEDDING_MODEL=bge-m3
+      - EMBEDDING_DIMENSION=1024
+      - EMBEDDING_DEVICE=cpu
+      - EMBEDDING_USE_FP16=false
+      - EMBEDDING_BATCH_SIZE=4
+      - WHISPER_DEVICE=cpu
+      - SECRET_KEY=mnemos_siss_2026_local
+      - UPLOAD_FOLDER=/app/uploads
+      - ARCHIVE_FOLDER=/app/archive
+    volumes:
+      - ./app:/app/app:rw
+      - ./config:/app/config:rw
+      - ./data/uploads:/app/uploads
+      - ./data/archive:/app/archive
+      - ./data/whisper_cache:/root/.cache/whisper
+    depends_on:
+      - app

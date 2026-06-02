@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 4
-MAX_WORKERS = 5
+MAX_WORKERS = 1
 
 HYPERGRAPH_SCHEMA = {
     "name": "hypergraph_extraction",

@@ -91,7 +91,8 @@ class LLMClient:
             url = base_url or settings.OLLAMA_BASE_URL
             self.client = OpenAI(
                 base_url=url,
-                api_key="ollama"
+                api_key="ollama",
+                timeout=120.0
             )
             self.model = model or s_local_model
 

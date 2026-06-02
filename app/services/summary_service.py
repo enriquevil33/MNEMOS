@@ -95,7 +95,7 @@ class SummaryService:
             
             map_results = [None] * len(batches) # Pre-allocate to maintain order
             
-            with ThreadPoolExecutor(max_workers=5) as executor:
+            with ThreadPoolExecutor(max_workers=1) as executor:
                 # Submit all tasks, passing the client AND model explicitly
                 future_to_index = {
                     executor.submit(
